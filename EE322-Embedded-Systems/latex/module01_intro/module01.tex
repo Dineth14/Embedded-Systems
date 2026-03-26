@@ -1,0 +1,345 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 1: Introduction to Embedded Systems
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Introduction to Embedded Systems}
+\label{ch:intro}
+\chaptermark{Module 1}
+
+\begin{moduleinfo}
+  \textbf{Module:} 1 \quad
+  \textbf{Lecture Hours:} 2 \quad
+  \textbf{ILOs Addressed:} ILO-1, ILO-2 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Define an embedded system and distinguish it from a general-purpose computer.
+    \item Identify application domains and classify systems by their real-time and safety requirements.
+    \item Compare embedded system platforms (microprocessor, microcontroller, SBC, industrial PC).
+    \item Analyse the key design challenges in embedded systems engineering.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{What is an Embedded System?}
+\label{sec:intro:what}
+
+\begin{definition}[Embedded System]
+An \textbf{embedded system} is a special-purpose computing system designed to perform one or a few dedicated functions, often as part of a larger mechanical or electrical system. Unlike general-purpose computers, embedded systems are optimised for specific tasks with constraints on power, size, cost, and real-time responsiveness.
+\end{definition}
+
+An embedded system typically consists of a processor (microprocessor or microcontroller), memory, input/output peripherals, and application-specific software. The software, often called \emph{firmware}, is stored in non-volatile memory (usually Flash) and executes immediately upon power-on without user intervention.
+
+\subsection{Contrast with General-Purpose Computers}
+
+A desktop PC or laptop is designed to run a wide variety of applications chosen by the user. In contrast, an embedded system is pre-programmed at the factory to perform a specific function. \tabref{tab:intro:gpvsemb} highlights the key differences.
+
+\begin{table}[H]
+\centering
+\caption{General-purpose computer vs.\ embedded system.}
+\label{tab:intro:gpvsemb}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Attribute} & \textbf{General-Purpose Computer} & \textbf{Embedded System} \\
+\midrule
+Primary function & Runs user-selected applications & Dedicated single/few functions \\
+Operating system & Full OS (Windows, Linux, macOS) & Bare-metal, RTOS, or lightweight Linux \\
+User interface & Rich GUI, keyboard, mouse & Minimal: buttons, LEDs, LCD, or none \\
+Processing power & High (multi-GHz, multi-core) & Low--moderate (kHz to hundreds of MHz) \\
+Memory & GB of RAM, TB of storage & KB--MB of RAM, KB--MB of Flash \\
+Power consumption & 50--500\,W & $\mu$W--W range \\
+Cost per unit & \$500--\$5000+ & \$0.10--\$50 \\
+Real-time constraints & Generally none & Often hard or soft real-time \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Real-Time Constraints}
+
+Many embedded systems must respond to events within strict time limits. These constraints are classified as:
+
+\begin{itemize}
+  \item \textbf{Hard real-time:} Missing a deadline leads to system failure or catastrophic consequences (e.g., airbag deployment, anti-lock braking).
+  \item \textbf{Soft real-time:} Missing a deadline degrades quality but does not cause failure (e.g., video streaming, audio playback).
+  \item \textbf{Non-real-time:} No timing constraints on response (e.g., a temperature logger that records data hourly).
+\end{itemize}
+
+\subsection{Resource Constraints}
+
+Embedded systems operate under severe resource limitations compared to desktop machines:
+\begin{itemize}
+  \item \textbf{Processing:} Clock frequencies from 1\,MHz (low-power MCU) to 1\,GHz (application processor).
+  \item \textbf{Memory:} As little as 256 bytes of RAM on an 8-bit MCU; typically 64\,KB--1\,MB for Cortex-M class.
+  \item \textbf{Power:} Battery-operated devices may need to run for years on a coin cell ($<$50\,$\mu$A average current).
+  \item \textbf{Cost:} High-volume consumer products demand sub-dollar BOM costs per unit.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Application Domains}
+\label{sec:intro:domains}
+
+Embedded systems are ubiquitous. \tabref{tab:intro:domains} classifies major application domains by their constraints.
+
+\begin{table}[H]
+\centering
+\caption{Embedded system application domains and constraints.}
+\label{tab:intro:domains}
+\begin{tabularx}{\textwidth}{l c c c c}
+\toprule
+\textbf{Domain} & \textbf{RT Type} & \textbf{Power Budget} & \textbf{Safety Criticality} & \textbf{Volume} \\
+\midrule
+Consumer electronics & Soft & Low--Medium & Low & Very High \\
+Automotive & Hard & Medium & High (ASIL D) & High \\
+Industrial automation & Hard & Medium--High & Medium--High & Medium \\
+Medical devices & Hard/Soft & Low--Medium & Very High (IEC 62304) & Medium \\
+Aerospace \& defence & Hard & Varies & Extreme (DO-178C) & Low \\
+Telecommunications & Soft & High & Medium & High \\
+IoT \& wearables & Soft/None & Ultra-Low & Low & Very High \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Consumer Electronics}
+Smartphones, smart TVs, game controllers, wireless earbuds, and fitness trackers all contain embedded processors. These systems prioritise low cost, low power, and user responsiveness.
+
+\subsection{Automotive}
+A modern vehicle contains 70--150 Electronic Control Units (ECUs), each an embedded system. Functions include engine management, ABS, airbag control, infotainment, and Advanced Driver Assistance Systems (ADAS). Automotive embedded systems must comply with ISO~26262 functional safety standards.
+
+\subsection{Industrial Automation}
+Programmable Logic Controllers (PLCs), motor drives, and CNC machines rely on embedded processors for precise, deterministic control loops. Communication buses like CAN, Modbus, and EtherCAT interconnect these units.
+
+\subsection{Medical Devices}
+Pacemakers, insulin pumps, patient monitors, and MRI scanners are safety-critical embedded systems. IEC~62304 governs software lifecycle processes, and high reliability (MTTF $>$ 100{,}000 hours) is mandatory.
+
+\subsection{Aerospace and Defence}
+Flight computers, missile guidance systems, satellite subsystems, and radar signal processors operate under extreme environmental conditions (temperature, vibration, radiation). DO-178C certification requires rigorous verification.
+
+% ----------------------------------------------------------------------------
+\section{Embedded System Platforms}
+\label{sec:intro:platforms}
+
+Embedded systems can be built on a range of hardware platforms, each offering different tradeoffs.
+
+\subsection{Microprocessor-Based Systems}
+A microprocessor (MPU) contains only the CPU core: ALU, control unit, and register file. External chips provide memory (SRAM, DRAM, Flash), I/O peripherals, and clock generation on a PCB. Examples: Intel x86 embedded variants, older Motorola 68000. This approach offers flexibility but increased board complexity, power, and cost.
+
+\subsection{Microcontroller-Based Systems}
+A microcontroller (MCU) integrates the CPU, Flash memory, SRAM, and peripherals (timers, ADC, UART, SPI, I\textsuperscript{2}C, GPIO) on a single chip. This integration dramatically reduces PCB complexity and cost. MCUs dominate the embedded world, with families such as:
+\begin{itemize}[nosep]
+  \item \textbf{8-bit:} Atmel AVR (ATmega328P in Arduino Uno), Microchip PIC
+  \item \textbf{16-bit:} MSP430 (ultra-low-power), dsPIC
+  \item \textbf{32-bit:} ARM Cortex-M series (STM32, nRF52, LPC), ESP32 (Wi-Fi/BLE SoC)
+\end{itemize}
+
+\subsection{Single Board Computers (SBCs)}
+SBCs like the Raspberry Pi, BeagleBone, and NVIDIA Jetson Nano integrate an application-class processor (ARM Cortex-A) with DRAM, display output, USB, Ethernet, and GPIO. They run full Linux and are used for rapid prototyping, IoT gateways, and edge computing.
+
+\subsection{Industrial Embedded Computers}
+Ruggedised embedded computers run deterministic real-time operating systems such as VxWorks, QNX, or INTEGRITY. They feature ECC memory, watchdog timers, and wide temperature ranges ($-40\degree$C to $+85\degree$C). Applications include railway signalling, nuclear plant control, and avionics.
+
+\begin{table}[H]
+\centering
+\caption{Platform comparison: microprocessor vs.\ microcontroller vs.\ SBC vs.\ industrial PC.}
+\label{tab:intro:platforms}
+\begin{tabularx}{\textwidth}{l X X X X}
+\toprule
+\textbf{Feature} & \textbf{Microprocessor} & \textbf{Microcontroller} & \textbf{SBC} & \textbf{Industrial PC} \\
+\midrule
+Integration & CPU only & CPU + peripherals & SoC + DRAM + I/O & Full system \\
+Typical clock & 100\,MHz--2\,GHz & 1--600\,MHz & 1--2\,GHz & 1--3\,GHz \\
+RAM & External, MB--GB & On-chip, KB--MB & On-board, 1--8\,GB & 2--32\,GB \\
+OS & RTOS or bare-metal & Bare-metal or RTOS & Linux/Android & VxWorks/QNX/Linux \\
+Unit cost & \$5--\$50 & \$0.30--\$15 & \$15--\$200 & \$500--\$5000 \\
+Power & 0.5--20\,W & 1\,mW--1\,W & 2--15\,W & 10--100\,W \\
+Board complexity & High & Low & Medium & High \\
+Typical use & Legacy, DSP & Sensors, control & Prototyping, IoT & Safety-critical \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------------
+\section{Design Challenges}
+\label{sec:intro:challenges}
+
+Designing embedded systems presents a unique set of engineering challenges that distinguish the field from general software development.
+
+\subsection{Power Consumption}
+Battery-operated devices demand ultra-low-power design. Techniques include clock gating, dynamic voltage and frequency scaling (DVFS), sleep modes (from \emph{idle} consuming $\sim$1\,mA to \emph{deep sleep} consuming $<$1\,$\mu$A), and duty-cycling peripherals.
+
+\subsection{Area and Cost}
+In high-volume products (millions of units), saving even \$0.10 per BOM translates to millions in savings. This drives the choice of the cheapest MCU that meets requirements and minimisation of external components.
+
+\subsection{Real-Time Response}
+Deterministic response to external events (interrupts) within microseconds is essential for control applications. This requires careful software design: short ISRs, bounded execution times, and predictable scheduling.
+
+\subsection{Reliability and Safety}
+Embedded systems in automotive, medical, and aerospace domains must achieve very high reliability. Techniques include watchdog timers, ECC on memory, redundant processing (TMR), FMEA analysis, and certification to domain-specific safety standards.
+
+\subsection{Security}
+Connected embedded devices (IoT) face threats including firmware extraction, side-channel attacks, buffer overflows, and man-in-the-middle attacks on communication. Secure boot, encrypted storage, TLS/DTLS communication, and hardware security modules (HSMs) are critical countermeasures.
+
+\subsection{Development Complexity}
+Embedded development involves cross-compilation, hardware debugging (JTAG/SWD), logic analysers, oscilloscopes, and constrained debugging environments. Unlike desktop software, bugs may manifest only in specific hardware-software interactions.
+
+% ----------------------------------------------------------------------------
+\section{Case Study: Anti-Lock Braking System (ABS)}
+\label{sec:intro:abs}
+
+\begin{example}[Anti-Lock Braking System]
+An Anti-Lock Braking System (ABS) is a quintessential embedded system that illustrates all key embedded design principles.
+
+\textbf{Function:} Prevent wheel lock-up during emergency braking by modulating brake pressure on each wheel independently.
+
+\textbf{Architecture:}
+\begin{itemize}[nosep]
+  \item \textbf{Sensors:} Four wheel speed sensors (Hall effect or magnetoresistive) measuring rotation frequency.
+  \item \textbf{Actuators:} Hydraulic solenoid valves (one per wheel) controlling brake fluid pressure.
+  \item \textbf{Controller:} 32-bit MCU (e.g., Infineon AURIX TriCore) running ABS algorithm.
+  \item \textbf{Communication:} CAN bus connecting ABS ECU with engine ECU and dashboard.
+\end{itemize}
+
+\textbf{Constraints:}
+\begin{itemize}[nosep]
+  \item \textbf{Hard real-time:} Brake pressure must be adjusted within 5\,ms of detecting impending lock-up.
+  \item \textbf{Safety:} ASIL D (highest automotive safety integrity level per ISO 26262).
+  \item \textbf{Reliability:} Must operate correctly across $-40\degree$C to $+125\degree$C, vibration, and 15+ year lifespan.
+  \item \textbf{Power:} Powered by vehicle 12\,V battery; power is not a critical constraint.
+\end{itemize}
+
+\textbf{Algorithm sketch:} The ABS controller reads wheel speed every 1\,ms, computes the slip ratio $\lambda$ for each wheel:
+\[
+  \lambda = \frac{v_{\text{vehicle}} - v_{\text{wheel}}}{v_{\text{vehicle}}}
+\]
+If $\lambda > 0.15$ (threshold for impending lockup), the controller commands the solenoid valve to release brake pressure. When $\lambda$ falls below 0.10, pressure is reapplied. This cycle repeats at 15--20\,Hz, producing the characteristic ABS pulsation.
+\end{example}
+
+% TikZ block diagram: Generic Embedded System
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, rounded corners=2pt, minimum width=2.5cm, minimum height=1.2cm, align=center, thick, fill=ee-blue!10},
+    sensor/.style={draw, rounded corners=2pt, minimum width=2cm, minimum height=1cm, align=center, thick, fill=ee-green!10},
+    actuator/.style={draw, rounded corners=2pt, minimum width=2cm, minimum height=1cm, align=center, thick, fill=ee-amber!10},
+    power/.style={draw, rounded corners=2pt, minimum width=2cm, minimum height=1cm, align=center, thick, fill=ee-red!10},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    dasharrow/.style={-{Stealth[length=3mm]}, thick, dashed}
+  ]
+  
+  % Nodes
+  \node[sensor] (sensor) {Sensor\\(Transducer)};
+  \node[block, right=1.5cm of sensor] (adc) {Signal\\Conditioning\\+ ADC};
+  \node[block, right=1.5cm of adc] (mcu) {\textbf{MCU / MPU}\\(Processor +\\Memory)};
+  \node[block, right=1.5cm of mcu] (dac) {DAC /\\Driver\\Circuit};
+  \node[actuator, right=1.5cm of dac] (actuator) {Actuator\\(Motor, Valve)};
+  \node[power, below=1.5cm of mcu] (power) {Power Supply\\(Battery/Regulator)};
+  
+  % Communication
+  \node[block, above=1cm of mcu] (comm) {Communication\\Interface\\(UART, CAN, BLE)};
+  
+  % Arrows
+  \draw[arrow] (sensor) -- (adc);
+  \draw[arrow] (adc) -- (mcu);
+  \draw[arrow] (mcu) -- (dac);
+  \draw[arrow] (dac) -- (actuator);
+  \draw[arrow] (mcu) -- (comm);
+  
+  % Power arrows (dashed)
+  \draw[dasharrow, ee-red] (power) -- (mcu);
+  \draw[dasharrow, ee-red] (power) -| (adc);
+  \draw[dasharrow, ee-red] (power) -| (dac);
+  
+  % Physical world label
+  \node[above=0.2cm of sensor, font=\small\itshape, text=ee-gray] {Physical\\World};
+  \node[above=0.2cm of actuator, font=\small\itshape, text=ee-gray] {Physical\\World};
+  
+  % Feedback
+  \draw[arrow, ee-gray, dashed] (actuator.south) -- ++(0,-0.8) -| (sensor.south) node[pos=0.5, below, font=\footnotesize\itshape] {Feedback (physical process)};
+  
+\end{tikzpicture}
+\caption{Generic embedded system block diagram: sensor $\rightarrow$ MCU $\rightarrow$ actuator with power supply and communication interface.}
+\label{fig:intro:block}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:intro:examples}
+
+\begin{example}[Classifying Embedded Systems]
+Classify each of the following systems as hard real-time, soft real-time, or non-real-time. Justify your answer.
+\begin{enumerate}[label=(\alph*)]
+  \item Cardiac pacemaker
+  \item MP3 music player
+  \item Digital thermometer for a kitchen oven
+\end{enumerate}
+
+\begin{solution}
+\begin{enumerate}[label=(\alph*)]
+  \item \textbf{Hard real-time.} The pacemaker must deliver electrical stimulus to the heart within a precise timing window (typically $\pm$1\,ms). Missing a deadline can cause cardiac arrhythmia or death.
+  \item \textbf{Soft real-time.} Audio must be decoded and fed to the DAC at 44.1\,kHz. Occasional missed samples cause audible glitches but not catastrophic failure.
+  \item \textbf{Non-real-time.} The thermometer samples temperature every few seconds and displays it. A small delay in updating the display has no practical consequence.
+\end{enumerate}
+\end{solution}
+\end{example}
+
+\begin{example}[Estimating Memory Requirements]
+A sensor node samples a 12-bit ADC at 100\,Hz and stores 10 minutes of data before transmitting. Estimate the minimum RAM required for the data buffer.
+
+\begin{solution}
+Each ADC sample is 12 bits, stored as a 16-bit (2-byte) integer.
+
+Samples per 10 minutes:
+\[
+  N = 100 \times 60 \times 10 = 60{,}000 \text{ samples}
+\]
+
+Memory required:
+\[
+  M = 60{,}000 \times 2 = 120{,}000 \text{ bytes} = 117.2\,\text{KB}
+\]
+
+Therefore, the MCU needs at least 128\,KB of RAM (nearest power-of-2), making a Cortex-M4 class MCU (e.g., STM32F4 with 192\,KB SRAM) a suitable choice.
+\end{solution}
+\end{example}
+
+\begin{example}[Platform Selection]
+A company is designing a smart thermostat with a colour touchscreen, Wi-Fi connectivity, voice assistant integration, and a 5-year battery life goal. Which platform is most appropriate: 8-bit MCU, 32-bit MCU, SBC, or industrial PC? Justify.
+
+\begin{solution}
+A \textbf{32-bit MCU with integrated Wi-Fi} (e.g., ESP32-S3) is the most appropriate platform:
+
+\begin{itemize}[nosep]
+  \item A colour touchscreen requires a graphics driver with reasonable processing power---beyond 8-bit capability.
+  \item Wi-Fi is required; the ESP32-S3 integrates Wi-Fi/BLE natively, avoiding external modules.
+  \item Voice assistant integration can be offloaded to the cloud (the MCU handles only audio capture and streaming).
+  \item A 5-year battery life is feasible with aggressive sleep modes ($<$10\,$\mu$A deep sleep on ESP32).
+  \item An SBC (Raspberry Pi) would consume too much power ($\sim$2--5\,W idle) for battery operation.
+  \item An industrial PC is vastly over-specified in cost and power.
+\end{itemize}
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:intro:practice}
+
+\begin{exercise}[Embedded System Identification]
+Identify three embedded systems in a modern automobile other than ABS. For each, state the sensor(s), actuator(s), and the type of real-time constraint.
+\end{exercise}
+
+\begin{exercise}[Power Budget Estimation]
+A wearable fitness tracker uses a 100\,mAh coin-cell battery. The MCU draws 500\,$\mu$A in active mode and 2\,$\mu$A in sleep mode. If the device is active for 5\% of the time and sleeping for 95\%, estimate the battery life in days.
+\end{exercise}
+
+\begin{exercise}[Platform Selection Exercise]
+A startup is building a drone flight controller that must process IMU data at 1\,kHz, drive 4 ESCs via PWM, communicate via MAVLink over UART, and log data to an SD card. Recommend a platform class and justify your choice.
+\end{exercise}
+
+\begin{exercise}[Comparing Architectures]
+Draw a table comparing Von Neumann and Harvard memory architectures in terms of bus structure, instruction/data bandwidth, implementation complexity, and typical use cases. (This previews Module 2.)
+\end{exercise}
+
+\begin{exercise}[Design Challenge Analysis]
+For the following product, identify the top three design challenges and briefly explain how each would influence the choice of processor and OS:
+\emph{``A portable ECG monitor that records heart signals for 48 hours and wirelessly uploads data to a hospital server.''}
+\end{exercise}

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M05 — I/O Ports &amp; Communication | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html" class="active">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#gpio">GPIO &amp; Analog I/O</a></li>
+        <li><a href="#interrupt">Polling vs Interrupts</a></li>
+        <li><a href="#uart">UART Protocol</a></li>
+        <li><a href="#spi">SPI Protocol</a></li>
+        <li><a href="#i2c">I²C Protocol</a></li>
+        <li><a href="#sim-io">I/O Timing Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 05 — 2 Lecture Hours</div>
+        <h1 class="module-header__title">I/O Ports &amp; Communication</h1>
+      </div>
+
+      <section id="gpio" class="reveal">
+        <h2>GPIO &amp; Analog I/O</h2>
+        <p>GPIO (General Purpose Input/Output) pins can be configured as:</p>
+        <ul>
+          <li><strong>Input:</strong> floating, pull-up, or pull-down</li>
+          <li><strong>Output:</strong> push-pull or open-drain, with configurable speed</li>
+          <li><strong>Alternate Function:</strong> UART TX/RX, SPI, I2C, PWM, etc.</li>
+          <li><strong>Analog:</strong> ADC input or DAC output</li>
+        </ul>
+        <h3>ADC (Analog-to-Digital Converter)</h3>
+        <p>Resolution determines the number of discrete levels:</p>
+        <p>$$\text{LSB} = \frac{V_{\text{ref}}}{2^n}, \quad \text{Digital Value} = \left\lfloor \frac{V_{\text{in}} \times 2^n}{V_{\text{ref}}} \right\rfloor$$</p>
+        <p>where $n$ is the number of bits. A 12-bit ADC with $V_{\text{ref}} = 3.3\,\text{V}$ has LSB $= 3.3/4096 \approx 0.8\,\text{mV}$.</p>
+      </section>
+
+      <section id="interrupt" class="reveal">
+        <h2>Polling vs Interrupts vs DMA</h2>
+        <table>
+          <thead><tr><th>Method</th><th>CPU Overhead</th><th>Latency</th><th>Complexity</th><th>Best For</th></tr></thead>
+          <tbody>
+            <tr><td>Polling</td><td>High (busy-wait)</td><td>Depends on loop</td><td>Low</td><td>Simple, fast peripherals</td></tr>
+            <tr><td>Interrupt</td><td>Low (event-driven)</td><td>Deterministic</td><td>Medium</td><td>Sporadic events, real-time</td></tr>
+            <tr><td>DMA</td><td>Minimal</td><td>Hardware speed</td><td>High (setup)</td><td>Bulk data transfers</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="uart" class="reveal">
+        <h2>UART Protocol</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p><strong>UART</strong> (Universal Asynchronous Receiver/Transmitter) is a serial protocol with no clock line. Both sides agree on a baud rate. Frame format: [Start bit] [Data 5–9 bits] [Parity (optional)] [Stop bit(s)].</p>
+          <p>$$\text{Bit time} = 1 / \text{Baud rate}, \quad \text{Frame time} = \frac{\text{bits per frame}}{\text{Baud rate}}$$</p>
+        </div>
+        <p>Common configuration: <code>115200 8N1</code> = 115200 baud, 8 data bits, no parity, 1 stop bit. Each character takes 10 bit-times (1 start + 8 data + 1 stop) ≈ 86.8 μs.</p>
+      </section>
+
+      <section id="spi" class="reveal">
+        <h2>SPI Protocol</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p><strong>SPI</strong> (Serial Peripheral Interface) is a synchronous, full-duplex protocol with 4 signals: SCLK (clock), MOSI (Master Out Slave In), MISO (Master In Slave Out), CS (Chip Select, active low). SPI has 4 modes defined by clock polarity (CPOL) and phase (CPHA).</p>
+        </div>
+        <p>SPI advantages: high speed (up to 100+ MHz), full-duplex, simple hardware. Disadvantages: one CS line per slave, no flow control, no acknowledgement.</p>
+      </section>
+
+      <section id="i2c" class="reveal">
+        <h2>I²C Protocol</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p><strong>I²C</strong> (Inter-Integrated Circuit) is a synchronous, half-duplex, multi-master protocol using only 2 wires: SDA (data) and SCL (clock). Each device has a 7-bit address. Supports 100 kHz (standard), 400 kHz (fast), and 3.4 MHz (high-speed) modes.</p>
+        </div>
+        <p>I2C transaction: [Start] [Address + R/W] [ACK] [Data] [ACK] ... [Stop]. The master always drives SCL; SDA is bidirectional with open-drain drivers and pull-up resistors.</p>
+      </section>
+
+      <!-- I/O Timing Simulation -->
+      <section id="sim-io" class="reveal">
+        <h2>Interactive: Serial Protocol Timing</h2>
+        <div id="io-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">Protocol Waveform Viewer</div>
+            <div class="sim-container__controls">
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="control-group" style="padding: 0.75rem 1.25rem;">
+            <label>Protocol</label>
+            <select id="io-protocol-select" style="background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border-default);padding:0.3rem 0.5rem;border-radius:4px;font-family:var(--font-mono);font-size:0.8rem;">
+              <option value="uart">UART (8N1)</option>
+              <option value="spi">SPI Mode 0</option>
+              <option value="i2c">I²C Write</option>
+            </select>
+          </div>
+          <div class="sim-container__canvas" id="io-canvas" style="min-height:300px;"></div>
+          <div class="stat-display">
+            <div class="stat-item"><div class="stat-item__value" id="io-bit">0</div><div class="stat-item__label">Bit</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="io-byte">0x00</div><div class="stat-item__label">Byte</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="io-time">0 μs</div><div class="stat-item__label">Time</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_io_timing.js"></script>
+</body>
+</html>

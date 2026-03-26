@@ -1,0 +1,522 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 8: Analysis and Verification of Embedded Systems
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Analysis and Verification of Embedded Systems}
+\label{ch:analysis}
+\chaptermark{Module 8}
+
+\begin{moduleinfo}
+  \textbf{Module:} 8 \quad
+  \textbf{Lecture Hours:} 4 \quad
+  \textbf{ILOs Addressed:} ILO-6, ILO-7 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Profile embedded software for execution time, memory usage, and power consumption.
+    \item Perform Failure Mode and Effects Analysis (FMEA) on embedded systems.
+    \item Calculate reliability metrics (MTTF, MTBF, availability, FIT rate).
+    \item Apply formal verification concepts (model checking with SPIN, temporal logic).
+    \item Explain MISRA-C guidelines and their role in safety-critical software.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{Performance Analysis and Optimisation}
+\label{sec:ana:perf}
+
+\subsection{Profiling Metrics}
+
+Key performance indicators for embedded systems:
+\begin{itemize}[nosep]
+  \item \textbf{Execution time:} CPU cycles or wall-clock time consumed by a function or task.
+  \item \textbf{Memory footprint:} Flash (code + constants) and RAM (stack + heap + global data).
+  \item \textbf{Power consumption:} Average and peak current draw; energy per operation.
+  \item \textbf{Throughput:} Data processed per unit time (bytes/s, samples/s).
+  \item \textbf{Latency:} Time from stimulus to response (interrupt latency, task response time).
+\end{itemize}
+
+\subsection{ARM Cortex-M DWT Cycle Counter}
+
+The Data Watchpoint and Trace (DWT) unit on Cortex-M3/M4/M7 provides a free-running cycle counter.
+
+\begin{lstlisting}[style=C, caption={Using the DWT cycle counter for execution time measurement.}]
+#include <stdint.h>
+
+// DWT register addresses
+#define DWT_CYCCNT   (*(volatile uint32_t *)0xE0001004)
+#define DWT_CONTROL  (*(volatile uint32_t *)0xE0001000)
+#define SCB_DEMCR    (*(volatile uint32_t *)0xE000EDFC)
+
+void dwt_init(void) {
+    SCB_DEMCR |= (1 << 24);    // Enable DWT
+    DWT_CYCCNT = 0;             // Reset counter
+    DWT_CONTROL |= 1;           // Enable CYCCNT
+}
+
+static inline uint32_t dwt_get_cycles(void) {
+    return DWT_CYCCNT;
+}
+
+// Usage example
+void measure_function(void) {
+    uint32_t start = dwt_get_cycles();
+    
+    // --- Code under measurement ---
+    my_dsp_function();
+    // ---
+    
+    uint32_t end = dwt_get_cycles();
+    uint32_t elapsed = end - start;  // handles wrap-around
+    
+    // At 168 MHz: time_us = elapsed / 168
+    float time_us = (float)elapsed / 168.0f;
+}
+\end{lstlisting}
+
+\subsection{Memory Analysis}
+
+\begin{lstlisting}[style=C, caption={Checking flash and RAM usage from the linker map file.}]
+/* After building, use arm-none-eabi-size: */
+//    text    data     bss     dec     hex  filename
+//   24576    1024    8192   33792    8400  firmware.elf
+//
+// Flash usage: text + data = 24576 + 1024 = 25600 bytes
+// RAM usage:   data + bss  = 1024 + 8192  = 9216 bytes
+\end{lstlisting}
+
+\subsection{Optimisation Techniques}
+
+\begin{table}[H]
+\centering
+\caption{Common embedded optimisation strategies.}
+\label{tab:ana:optim}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Technique} & \textbf{Description} \\
+\midrule
+Compiler optimisation flags & \texttt{-O2} (speed), \texttt{-Os} (size), \texttt{-Og} (debug-friendly) \\
+Loop unrolling & Reduce loop overhead at the cost of code size \\
+Lookup tables & Replace computation with pre-computed table (e.g., sine LUT) \\
+Fixed-point arithmetic & Avoid floating-point on cores without FPU \\
+DMA transfers & Offload data movement from CPU \\
+Sleep modes & Reduce power by entering low-power states when idle \\
+Dead code elimination & Remove unused functions (\texttt{-ffunction-sections -Wl,--gc-sections}) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{practicalNote}
+Always profile before optimising. Premature optimisation is the root of all evil (Knuth). Use the DWT counter or an oscilloscope to identify hotspots.
+\end{practicalNote}
+
+% ----------------------------------------------------------------------------
+\section{Failure Mode and Effects Analysis (FMEA)}
+\label{sec:ana:fmea}
+
+\begin{definition}[FMEA]
+Failure Mode and Effects Analysis is a systematic, proactive method for analysing potential failure modes of a system, their causes, effects, and criticality. The output is a prioritised list of risks, each assigned a Risk Priority Number (RPN).
+\end{definition}
+
+\[
+\text{RPN} = \text{Severity} \times \text{Occurrence} \times \text{Detection}
+\]
+
+where each factor is rated 1--10 (1 = best, 10 = worst).
+
+\begin{table}[H]
+\centering
+\caption{Example FMEA table for an embedded temperature controller.}
+\label{tab:ana:fmea}
+\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{1.8cm}p{2.2cm}Xp{0.6cm}p{0.6cm}p{0.6cm}p{0.8cm}X@{}}
+\toprule
+\textbf{Component} & \textbf{Failure Mode} & \textbf{Effect} & \textbf{S} & \textbf{O} & \textbf{D} & \textbf{RPN} & \textbf{Mitigation} \\
+\midrule
+ADC & Stuck at max & Controller thinks temp is max, turns heater off permanently & 7 & 3 & 5 & 105 & Range check on ADC value \\
+MCU & Watchdog timeout & System resets, brief control loss & 5 & 2 & 2 & 20 & Safe state on reset \\
+Heater relay & Stuck closed & Uncontrolled heating, fire risk & 10 & 2 & 6 & 120 & Thermal fuse, redundant temp sensor \\
+Firmware & Stack overflow & Undefined behaviour, crash & 8 & 4 & 7 & 224 & Stack canary, FreeRTOS stack check \\
+Power supply & Brownout & MCU resets or corrupts data & 6 & 3 & 4 & 72 & BOR circuit, EEPROM write verify \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------------
+\section{Reliability and Availability}
+\label{sec:ana:reliability}
+
+\begin{definition}[Reliability]
+Reliability $R(t)$ is the probability that a system performs its intended function without failure for a specified time $t$ under stated conditions. For constant failure rate $\lambda$:
+\[
+R(t) = e^{-\lambda t}
+\]
+\end{definition}
+
+Key metrics:
+\begin{align}
+\text{MTTF} &= \frac{1}{\lambda} & &\text{(Mean Time To Failure, non-repairable)} \\
+\text{MTBF} &= \text{MTTF} + \text{MTTR} & &\text{(Mean Time Between Failures)} \\
+\text{Availability} &= \frac{\text{MTTF}}{\text{MTTF} + \text{MTTR}} & &\text{(Steady-state)} \\
+\text{FIT rate} &= \frac{10^9}{\text{MTTF (hours)}} & &\text{(Failures In Time per $10^9$ hours)}
+\end{align}
+
+\subsection{Bathtub Curve}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \begin{axis}[
+    width=12cm, height=6cm,
+    xlabel={Time},
+    ylabel={Failure Rate $\lambda(t)$},
+    xmin=0, xmax=10, ymin=0, ymax=5,
+    xtick=\empty, ytick=\empty,
+    axis lines=left,
+    every axis x label/.style={at={(axis description cs:1,0)}, anchor=west},
+    every axis y label/.style={at={(axis description cs:0,1)}, anchor=south},
+    clip=false
+  ]
+    % Infant mortality (decreasing)
+    \addplot[domain=0:2.5, thick, ee-blue, samples=50] {3*exp(-1.5*x) + 0.5};
+    
+    % Useful life (constant)
+    \addplot[domain=2.5:7, thick, ee-green!70!black, samples=50] {0.5};
+    
+    % Wear-out (increasing)
+    \addplot[domain=7:10, thick, ee-red, samples=50] {0.5 + 0.15*(x-7)^2};
+    
+    % Annotations
+    \node[font=\footnotesize, text=ee-blue] at (axis cs:1.2,3.5) {Infant Mortality};
+    \node[font=\footnotesize, text=ee-green!70!black] at (axis cs:4.75,1.2) {Useful Life};
+    \node[font=\footnotesize, text=ee-green!70!black] at (axis cs:4.75,0.9) {(constant $\lambda$)};
+    \node[font=\footnotesize, text=ee-red] at (axis cs:8.8,2.5) {Wear-Out};
+    
+    % Dashed dividers
+    \draw[dashed, thin, gray] (axis cs:2.5, 0) -- (axis cs:2.5, 4.5);
+    \draw[dashed, thin, gray] (axis cs:7, 0) -- (axis cs:7, 4.5);
+    
+  \end{axis}
+\end{tikzpicture}
+\caption{Bathtub curve: failure rate over the lifetime of electronic systems.}
+\label{fig:ana:bathtub}
+\end{figure}
+
+\subsection{Redundancy: Triple Modular Redundancy (TMR)}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=2cm, minimum height=1cm, rounded corners=2pt, font=\small\bfseries},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+  ]
+  
+  \node[block, fill=ee-blue!15] (m1) at (0, 1.5) {Module 1};
+  \node[block, fill=ee-blue!15] (m2) at (0, 0)   {Module 2};
+  \node[block, fill=ee-blue!15] (m3) at (0,-1.5)  {Module 3};
+  
+  \node[block, fill=ee-amber!15, minimum width=2.5cm] (voter) at (5, 0) {Majority Voter};
+  
+  \node[font=\small] (input) at (-3.5, 0) {Input};
+  \node[font=\small] (output) at (8.5, 0) {Output};
+  
+  \draw[arrow] (input) -- (-1.5,0);
+  \draw[arrow] (-1.5,0) |- (m1);
+  \draw[arrow] (-1.5,0) -- (m2);
+  \draw[arrow] (-1.5,0) |- (m3);
+  
+  \draw[arrow] (m1) -| (voter);
+  \draw[arrow] (m2) -- (voter);
+  \draw[arrow] (m3) -| (voter);
+  
+  \draw[arrow] (voter) -- (output);
+  
+\end{tikzpicture}
+\caption{Triple Modular Redundancy: three identical modules feed a majority voter.}
+\label{fig:ana:tmr}
+\end{figure}
+
+TMR reliability (assuming independent failures, perfect voter):
+\[
+R_{\text{TMR}}(t) = 3R(t)^2 - 2R(t)^3 = 3e^{-2\lambda t} - 2e^{-3\lambda t}
+\]
+
+TMR is more reliable than a single module for $R(t) > 0.5$ (i.e., early in the system's life).
+
+% ----------------------------------------------------------------------------
+\section{Formal Verification}
+\label{sec:ana:formal}
+
+\begin{definition}[Formal Verification]
+Formal verification uses mathematical techniques to prove or disprove that a system design satisfies a formal specification. Unlike testing, which can only show the presence of bugs, formal verification can prove their \emph{absence} (within the scope of the model).
+\end{definition}
+
+\subsection{Model Checking with SPIN and Promela}
+
+SPIN (Simple Promela Interpreter) is a model checker for verifying properties of concurrent systems.
+
+\begin{lstlisting}[language=C, style=C, caption={Promela model of a producer-consumer system with bounded buffer.}, label={lst:ana:promela}]
+/* Promela: producer-consumer with semaphores */
+#define N 4  /* buffer size */
+
+byte buffer[N];
+byte in = 0, out = 0, count = 0;
+
+/* Semaphores modeled as byte variables */
+byte mutex = 1;
+byte empty_slots = N;
+byte full_slots = 0;
+
+inline P(sem) { atomic { sem > 0 -> sem-- } }
+inline V(sem) { atomic { sem++ } }
+
+active proctype Producer() {
+    byte item = 0;
+    do
+    :: P(empty_slots);
+       P(mutex);
+       buffer[in] = item;
+       in = (in + 1) % N;
+       count++;
+       V(mutex);
+       V(full_slots);
+       item++;
+    od
+}
+
+active proctype Consumer() {
+    byte data;
+    do
+    :: P(full_slots);
+       P(mutex);
+       data = buffer[out];
+       out = (out + 1) % N;
+       count--;
+       V(mutex);
+       V(empty_slots);
+    od
+}
+
+/* Safety property: buffer never overflows or underflows */
+ltl safe { [](count >= 0 && count <= N) }
+\end{lstlisting}
+
+\subsection{Temporal Logic}
+
+Temporal logic expresses properties about system behaviour over time:
+
+\textbf{Linear Temporal Logic (LTL):}
+\begin{itemize}[nosep]
+  \item $\square p$ (``always $p$''): $p$ holds in every state.
+  \item $\lozenge p$ (``eventually $p$''): $p$ holds in some future state.
+  \item $p \mathbin{\mathcal{U}} q$ (``$p$ until $q$''): $p$ holds until $q$ becomes true.
+  \item $\bigcirc p$ (``next $p$''): $p$ holds in the next state.
+\end{itemize}
+
+Common embedded system properties expressed in LTL:
+\begin{itemize}[nosep]
+  \item \textbf{Safety} (bad things never happen): $\square \neg \text{overflow}$
+  \item \textbf{Liveness} (good things eventually happen): $\square(\text{request} \rightarrow \lozenge \text{grant})$
+  \item \textbf{Mutual exclusion:} $\square \neg (\text{cs}_1 \land \text{cs}_2)$
+  \item \textbf{Deadlock freedom:} $\square \lozenge \text{progress}$
+\end{itemize}
+
+\subsection{Timed Automata and UPPAAL}
+
+UPPAAL models real-time systems as networks of timed automata with clock constraints. Useful for verifying timing properties like ``the airbag deploys within 10\,ms of impact detection.''
+
+% ----------------------------------------------------------------------------
+\section{MISRA-C Guidelines}
+\label{sec:ana:misra}
+
+\begin{definition}[MISRA-C]
+MISRA-C\cite{misrac2012} is a set of software development guidelines for the C language in safety-critical and security-critical embedded systems. Originally developed for the automotive industry, it is now used across aerospace, medical, rail, and defence.
+\end{definition}
+
+\textbf{MISRA-C 2012 rule categories:}
+\begin{itemize}[nosep]
+  \item \textbf{Mandatory:} Must be followed (e.g., no undefined behaviour).
+  \item \textbf{Required:} Must be followed unless a formal deviation is documented.
+  \item \textbf{Advisory:} Recommended best practice.
+\end{itemize}
+
+\textbf{Selected important rules:}
+
+\begin{table}[H]
+\centering
+\caption{Selected MISRA-C 2012 rules relevant to embedded programming.}
+\label{tab:ana:misra}
+\begin{tabularx}{\linewidth}{@{}lp{2.2cm}X@{}}
+\toprule
+\textbf{Rule} & \textbf{Category} & \textbf{Description} \\
+\midrule
+Rule 1.3 & Required & There shall be no occurrence of undefined or critical unspecified behaviour. \\
+Rule 11.3 & Required & A cast shall not be performed between a pointer to object type and a pointer to a different object type. \\
+Rule 14.3 & Required & Controlling expressions shall not be invariant. \\
+Rule 17.7 & Required & The value returned by a function having non-void return type shall be used. \\
+Rule 21.3 & Required & The memory allocation and deallocation functions of \texttt{<stdlib.h>} shall not be used. \\
+Dir 4.1 & Required & Run-time failures shall be minimised. \\
+Dir 4.6 & Advisory & \texttt{typedefs} that indicate size and signedness should be used in place of the basic numerical types. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{important}[Why No Dynamic Memory?]
+Rule 21.3 prohibits \texttt{malloc()}/\texttt{free()} because:
+\begin{enumerate}[nosep]
+  \item Heap fragmentation can cause allocation failures in long-running systems.
+  \item Non-deterministic execution time of \texttt{malloc()}.
+  \item Memory leaks are catastrophic in systems that cannot be rebooted.
+\end{enumerate}
+Instead, use statically allocated buffers, memory pools, or stack allocation.
+\end{important}
+
+\subsection{CRC for Data Integrity}
+
+Cyclic Redundancy Check (CRC) is widely used for detecting data corruption in communication and storage.
+
+\begin{lstlisting}[style=C, caption={CRC-32 implementation (IEEE 802.3 polynomial).}]
+#include <stdint.h>
+
+static uint32_t crc32_table[256];
+
+void crc32_init(void) {
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t crc = i;
+        for (int j = 0; j < 8; j++) {
+            if (crc & 1)
+                crc = (crc >> 1) ^ 0xEDB88320;
+            else
+                crc >>= 1;
+        }
+        crc32_table[i] = crc;
+    }
+}
+
+uint32_t crc32_compute(const uint8_t *data, uint32_t length) {
+    uint32_t crc = 0xFFFFFFFF;
+    for (uint32_t i = 0; i < length; i++) {
+        uint8_t index = (uint8_t)(crc ^ data[i]);
+        crc = (crc >> 8) ^ crc32_table[index];
+    }
+    return crc ^ 0xFFFFFFFF;
+}
+\end{lstlisting}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:ana:examples}
+
+\begin{example}[Reliability Calculation]
+A system has three components in series: MCU ($\lambda_1 = 10$ FIT), EEPROM ($\lambda_2 = 5$ FIT), and power supply ($\lambda_3 = 20$ FIT). Calculate: (a) system MTTF, (b) reliability at $t = 10{,}000$ hours, (c) availability if MTTR = 2 hours.
+
+\begin{solution}
+(a) Series system failure rate: $\lambda_{\text{sys}} = \lambda_1 + \lambda_2 + \lambda_3 = 35$ FIT.
+
+$\text{MTTF} = \frac{10^9}{\lambda_{\text{sys}}} = \frac{10^9}{35} = 28{,}571{,}429$ hours $\approx 3{,}261$ years.
+
+(b) $R(10{,}000) = e^{-\lambda_{\text{sys}} \times t} = e^{-35 \times 10^{-9} \times 10{,}000} = e^{-3.5 \times 10^{-4}} \approx 0.99965$ ($99.965\%$).
+
+(c) $A = \frac{\text{MTTF}}{\text{MTTF} + \text{MTTR}} = \frac{28{,}571{,}429}{28{,}571{,}429 + 2} \approx 0.99999993$ ($\sim$7 nines).
+\end{solution}
+\end{example}
+
+\begin{example}[TMR vs.\ Simplex]
+Compare the reliability of a simplex system vs.\ TMR at $t = 100{,}000$ hours if each module has $\lambda = 100$ FIT.
+
+\begin{solution}
+$\lambda = 100 \times 10^{-9}$ failures/hour. At $t = 100{,}000$ hours:
+
+\textbf{Simplex:} $R_S(t) = e^{-\lambda t} = e^{-100 \times 10^{-9} \times 10^5} = e^{-0.01} = 0.99005$.
+
+\textbf{TMR:} $R_{\text{TMR}}(t) = 3e^{-2\lambda t} - 2e^{-3\lambda t} = 3e^{-0.02} - 2e^{-0.03}$.
+
+$= 3(0.98020) - 2(0.97045) = 2.94060 - 1.94090 = 0.99970$.
+
+TMR reliability $0.99970 > 0.99005$ simplex. TMR improves reliability from 2 nines to nearly 4 nines at this operating point.
+\end{solution}
+\end{example}
+
+\begin{example}[FMEA Risk Prioritisation]
+Given the FMEA table in Table~\ref{tab:ana:fmea}, identify the highest-risk item and propose additional mitigation measures.
+
+\begin{solution}
+Highest RPN: \textbf{Firmware stack overflow} (RPN = 224).
+
+This is the highest risk because:
+\begin{itemize}[nosep]
+  \item Severity is high (8): undefined behaviour can be catastrophic.
+  \item Occurrence is moderate (4): stack overflows are common during development.
+  \item Detection is poor (7): often manifests as seemingly random crashes.
+\end{itemize}
+
+\textbf{Additional mitigations:}
+\begin{enumerate}[nosep]
+  \item Use MPU (Memory Protection Unit) to mark stack guard regions.
+  \item Enable FreeRTOS \texttt{configCHECK\_FOR\_STACK\_OVERFLOW} (method 2).
+  \item Run static analysis (e.g., StackAnalyzer) to compute maximum stack depth.
+  \item Place stack canary values and check periodically.
+  \item During testing, fill stacks with a known pattern and measure high-water mark.
+\end{enumerate}
+
+After mitigation, re-rate: Detection drops to 3, new RPN = $8 \times 4 \times 3 = 96$.
+\end{solution}
+\end{example}
+
+\begin{example}[Formal Verification Property]
+Express the following requirements as LTL formulas:
+(a) ``The motor is never on while the safety guard is open.''
+(b)~``Every sensor reading request is eventually served.''
+(c)~``The system never enters both heating and cooling modes simultaneously.''
+
+\begin{solution}
+(a) $\square(\text{guard\_open} \rightarrow \neg\text{motor\_on})$
+
+(b) $\square(\text{sensor\_request} \rightarrow \lozenge \text{sensor\_served})$
+
+(c) $\square \neg (\text{heating} \land \text{cooling})$
+
+To verify these in SPIN, they would be written as:
+\begin{lstlisting}[language=C, style=C, numbers=none]
+/* (a) */ ltl safe_guard { [](guard_open -> !motor_on) }
+/* (b) */ ltl liveness   { [](sensor_request -> <>sensor_served) }
+/* (c) */ ltl exclusive  { [](!(heating && cooling)) }
+\end{lstlisting}
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:ana:practice}
+
+\begin{exercise}[Performance Profiling]
+You measure a function at 2{,}000 cycles on Cortex-M4 at \freq{168}{MHz}. The function is called every 1\,ms. (a) What is the CPU utilisation due to this function? (b) If you optimise it to 800 cycles using a lookup table that consumes 4\,KB of Flash, discuss the trade-off.
+\end{exercise}
+
+\begin{exercise}[Reliability Series-Parallel]
+Design a system with two subsystems: Subsystem A ($\lambda_A = 50$ FIT) needs 99.99\% reliability over 5 years. (a) Does a single module meet this? (b) Design a TMR configuration and calculate its reliability. (c) At what operating time does TMR become less reliable than simplex?
+\end{exercise}
+
+\begin{exercise}[FMEA Practice]
+Create an FMEA table for a drone flight controller with at least 5 failure modes. Include: IMU sensor failure, GPS loss, motor ESC failure, battery voltage drop, and communication link loss. Assign S, O, D ratings and calculate RPNs.
+\end{exercise}
+
+\begin{exercise}[Model Checking]
+Write a Promela model for two tasks sharing a critical section protected by Peterson's algorithm. Define an LTL property for mutual exclusion and describe how SPIN would verify it.
+\end{exercise}
+
+\begin{exercise}[MISRA-C Review]
+Identify MISRA-C 2012 violations in the following code and explain how to fix each:
+\begin{lstlisting}[style=C, numbers=none]
+int* ptr = (int*)malloc(sizeof(int) * 10);
+for (int i = 0; i <= 10; i++)  // potential off-by-one
+    ptr[i] = i;
+printf("Done");               // return value unused
+free(ptr);
+\end{lstlisting}
+\end{exercise}
+
+\begin{exercise}[CRC Application]
+A 64-byte data packet is protected by CRC-32. (a) What is the total frame size? (b) If a single bit is flipped in the data, will CRC-32 detect it? (c) What is the probability of an undetected error for a random error pattern?
+\end{exercise}

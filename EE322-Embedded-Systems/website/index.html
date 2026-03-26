@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EE322 — Embedded Systems Design</title>
+  <meta name="description" content="Interactive lecture notes and simulations for EE322 Embedded Systems Design, University of Peradeniya.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Highlight.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+  <!-- ---- Header ---- -->
+  <header class="site-header">
+    <div class="site-header__logo">
+      EE322 <span>Embedded Systems</span>
+    </div>
+    <nav class="site-header__nav">
+      <a href="index.html" class="active">Home</a>
+      <a href="modules/m01.html">Modules</a>
+    </nav>
+  </header>
+
+  <!-- ---- Hero ---- -->
+  <section class="hero">
+    <div class="hero__content">
+      <h1 class="hero__title">Embedded Systems Design</h1>
+      <p class="hero__subtitle">EE 322 — Department of Electrical &amp; Electronic Engineering</p>
+      <p class="hero__meta">University of Peradeniya, Sri Lanka &nbsp;|&nbsp; 3 Credits &nbsp;|&nbsp; 27 Lecture Hours</p>
+    </div>
+  </section>
+
+  <!-- ---- Module Grid ---- -->
+  <div class="container">
+    <h2>Course Modules</h2>
+    <div class="module-grid">
+
+      <a href="modules/m01.html" class="module-card reveal">
+        <div class="module-card__number">Module 01</div>
+        <div class="module-card__title">Introduction to Embedded Systems</div>
+        <div class="module-card__desc">Definitions, application domains, platform comparison, design challenges, and a case study on ABS braking.</div>
+        <div class="module-card__meta"><span>2 hrs</span><span>ILO-1</span></div>
+      </a>
+
+      <a href="modules/m02.html" class="module-card reveal">
+        <div class="module-card__number">Module 02</div>
+        <div class="module-card__title">Microprocessor &amp; Microcontroller Architecture</div>
+        <div class="module-card__desc">Von Neumann vs Harvard, CISC/RISC, pipelining, branch prediction, ARM Cortex-M memory model, and interrupts.</div>
+        <div class="module-card__meta"><span>5 hrs</span><span>ILO-1, ILO-2</span></div>
+      </a>
+
+      <a href="modules/m03.html" class="module-card reveal">
+        <div class="module-card__number">Module 03</div>
+        <div class="module-card__title">Embedded Processors</div>
+        <div class="module-card__desc">MCU/DSP/FPGA/ASIC taxonomy, ARM Cortex families, bare-metal C programming, CMSIS, cross-compilation.</div>
+        <div class="module-card__meta"><span>4 hrs</span><span>ILO-2, ILO-3</span></div>
+      </a>
+
+      <a href="modules/m04.html" class="module-card reveal">
+        <div class="module-card__number">Module 04</div>
+        <div class="module-card__title">Memory Architectures</div>
+        <div class="module-card__desc">SRAM, DRAM, Flash, MRAM, memory hierarchy, cache operation (direct-mapped, N-way), DMA transfers.</div>
+        <div class="module-card__meta"><span>2 hrs</span><span>ILO-2</span></div>
+      </a>
+
+      <a href="modules/m05.html" class="module-card reveal">
+        <div class="module-card__number">Module 05</div>
+        <div class="module-card__title">I/O Ports &amp; Communication</div>
+        <div class="module-card__desc">GPIO, ADC/DAC, PWM, polling vs interrupts, UART, SPI, I²C protocols with timing diagrams.</div>
+        <div class="module-card__meta"><span>2 hrs</span><span>ILO-3</span></div>
+      </a>
+
+      <a href="modules/m06.html" class="module-card reveal">
+        <div class="module-card__number">Module 06</div>
+        <div class="module-card__title">Multitasking</div>
+        <div class="module-card__desc">Super-loop limitations, threads/processes, context switching on Cortex-M, mutexes, semaphores, FreeRTOS.</div>
+        <div class="module-card__meta"><span>2 hrs</span><span>ILO-4, ILO-5</span></div>
+      </a>
+
+      <a href="modules/m07.html" class="module-card reveal">
+        <div class="module-card__number">Module 07</div>
+        <div class="module-card__title">Task Scheduling</div>
+        <div class="module-card__desc">RMS, EDF, DMS algorithms, utilisation bound, response time analysis, Gantt charts, WCET estimation.</div>
+        <div class="module-card__meta"><span>2 hrs</span><span>ILO-4, ILO-5</span></div>
+      </a>
+
+      <a href="modules/m08.html" class="module-card reveal">
+        <div class="module-card__number">Module 08</div>
+        <div class="module-card__title">Analysis &amp; Verification</div>
+        <div class="module-card__desc">Performance profiling, FMEA, reliability metrics, formal verification with SPIN/Promela, MISRA-C guidelines.</div>
+        <div class="module-card__meta"><span>4 hrs</span><span>ILO-6, ILO-7</span></div>
+      </a>
+
+      <a href="modules/m09.html" class="module-card reveal">
+        <div class="module-card__number">Module 09</div>
+        <div class="module-card__title">Modeling of Embedded Systems</div>
+        <div class="module-card__desc">UML diagrams, finite state machines, hierarchical state machines, FSM implementation in C, model-driven dev.</div>
+        <div class="module-card__meta"><span>4 hrs</span><span>ILO-7, ILO-8</span></div>
+      </a>
+
+    </div>
+
+    <!-- ---- Course Info Panel ---- -->
+    <div class="info-panel reveal">
+      <div class="info-panel__title">Course Information</div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Course Code</span>
+        <span class="info-panel__value">EE 322</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Credits</span>
+        <span class="info-panel__value">3</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Lecture Hours</span>
+        <span class="info-panel__value">27</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Department</span>
+        <span class="info-panel__value">Electrical &amp; Electronic Engineering</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Faculty</span>
+        <span class="info-panel__value">Faculty of Engineering</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">University</span>
+        <span class="info-panel__value">University of Peradeniya</span>
+      </div>
+      <div class="info-panel__row">
+        <span class="info-panel__label">Key References</span>
+        <span class="info-panel__value">Wolf (2012), Yiu (2014), Lee &amp; Seshia (2017)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Footer ---- -->
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design &nbsp;|&nbsp; University of Peradeniya &nbsp;|&nbsp; Department of EEE</p>
+    <p>Educational resource for academic use.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/core.js"></script>
+</body>
+</html>

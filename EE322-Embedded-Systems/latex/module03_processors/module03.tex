@@ -1,0 +1,585 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 3: Embedded Processors
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Embedded Processors}
+\label{ch:processors}
+\chaptermark{Module 3}
+
+\begin{moduleinfo}
+  \textbf{Module:} 3 \quad
+  \textbf{Lecture Hours:} 4 \quad
+  \textbf{ILOs Addressed:} ILO-2, ILO-3, ILO-4 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Classify embedded processors by type and application domain.
+    \item Compare ARM Cortex-M, Cortex-R, and Cortex-A processor families.
+    \item Describe DSP architectures including the SHARC super-Harvard design.
+    \item Write bare-metal C code for register-level peripheral control.
+    \item Explain startup code, linker scripts, and cross-compilation toolchains.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{Types of Embedded Processors}
+\label{sec:proc:types}
+
+\subsection{General-Purpose Microcontrollers}
+
+General-purpose MCUs are the workhorses of embedded design. They integrate a CPU core with on-chip Flash, SRAM, and peripherals for control-oriented tasks.
+
+\begin{itemize}
+  \item \textbf{AVR (Atmel, now Microchip):} 8-bit RISC, Harvard architecture, widely used in Arduino. ATmega328P: 16\,MHz, 32\,KB Flash, 2\,KB SRAM.
+  \item \textbf{PIC (Microchip):} Available in 8/16/32-bit variants. PIC18F series popular in cost-sensitive applications.
+  \item \textbf{STM32 (STMicroelectronics):} ARM Cortex-M based, spanning M0 (ultra-low-cost) to M7 (high-performance DSP). The STM32F4 series (\freq{168}{MHz}, Cortex-M4F) is widely used in university courses.
+  \item \textbf{ESP32 (Espressif):} Dual-core Xtensa LX6, integrated Wi-Fi and Bluetooth, popular for IoT.
+\end{itemize}
+
+\subsection{Digital Signal Processors (DSPs)}
+
+DSPs are optimized for repetitive, numerically intensive calculations found in signal processing:
+
+\begin{itemize}
+  \item \textbf{Hardware MAC unit:} A Multiply-Accumulate unit that computes $a = a + b \times c$ in a single cycle, essential for FIR/IIR filters, FFT, and matrix operations.
+  \item \textbf{Fixed-point arithmetic:} Many DSPs operate on Q15 or Q31 fixed-point formats, avoiding the area and power cost of floating-point hardware.
+  \item \textbf{Floating-point DSPs:} Higher-end DSPs (TI TMS320C6748, Analog Devices SHARC) include IEEE-754 floating-point units.
+  \item \textbf{VLIW (Very Long Instruction Word):} Multiple operations packed into a single wide instruction word, exploiting instruction-level parallelism. The compiler (not hardware) schedules parallel operations.
+  \item \textbf{Circular buffers:} Hardware-supported modular addressing for implementing delay lines without software overhead.
+\end{itemize}
+
+\subsection{Application Processors}
+
+Application processors (Cortex-A class) run feature-rich operating systems:
+\begin{itemize}
+  \item ARM Cortex-A53/A72: 64-bit, out-of-order execution, MMU for virtual memory, multi-level caches.
+  \item Multimedia extensions: NEON SIMD (Single Instruction, Multiple Data) for parallel 128-bit vector operations on 8/16/32-bit data lanes. Used for image/audio processing and machine learning inference.
+  \item Used in smartphones, SBCs (Raspberry Pi), and infotainment systems.
+\end{itemize}
+
+\subsection{FPGAs and Reconfigurable Computing}
+
+\begin{definition}[FPGA]
+A Field-Programmable Gate Array is an IC containing an array of configurable logic blocks (CLBs), interconnects, and I/O blocks that can be programmed after manufacturing to implement arbitrary digital circuits.
+\end{definition}
+
+When to use FPGAs:
+\begin{itemize}[nosep]
+  \item Custom hardware acceleration (e.g., video codec, cryptography).
+  \item Hard real-time requirements that software alone cannot meet.
+  \item Low-to-medium production volumes where ASIC NRE cost is prohibitive.
+  \item Rapid prototyping of digital designs before ASIC tape-out.
+\end{itemize}
+
+Vendors: Xilinx (now AMD) Artix/Kintex/Virtex, Intel (formerly Altera) Cyclone/Stratix, Lattice iCE40/ECP5.
+
+\subsection{ASICs (Application-Specific Integrated Circuits)}
+
+ASICs are custom-designed silicon for a single application. They offer the highest performance and lowest power per unit but require enormous NRE (Non-Recurring Engineering) costs (\$1M--\$100M+). Justified only at very high production volumes (millions of units) or where no other solution meets size/power targets (e.g., Bitcoin mining ASICs, smartphone SoCs).
+
+% ----------------------------------------------------------------------------
+\section{ARM Processor Family}
+\label{sec:proc:arm}
+
+ARM Holdings licenses processor core designs (IP) to semiconductor companies who fabricate chips. The ARM Cortex family is organised into three profiles:
+
+\subsection{Cortex-M: Microcontroller Profile}
+
+\begin{itemize}
+  \item \textbf{Cortex-M0/M0+:} Smallest ARM core, 8--32\,KB Flash, ideal for ultra-low-cost replacements of 8-bit MCUs. 2-stage pipeline, Thumb (16-bit) ISA subset.
+  \item \textbf{Cortex-M3:} 3-stage pipeline, full Thumb-2 ISA, hardware divide, bit-banding. Typical: \freq{72}{MHz}, 64--512\,KB Flash.
+  \item \textbf{Cortex-M4:} Cortex-M3 + DSP extensions (single-cycle MAC, SIMD) + optional single-precision FPU (M4F). Optimal for digital control and sensor fusion.
+  \item \textbf{Cortex-M7:} 6-stage superscalar pipeline, branch prediction, dual-issue, I/D cache, double-precision FPU. Up to \freq{480}{MHz}. Used in high-performance motor control and audio.
+\end{itemize}
+
+\subsection{Cortex-R: Real-Time Profile}
+
+Designed for hard real-time applications requiring deterministic response:
+\begin{itemize}[nosep]
+  \item Tightly-coupled memories (TCM) for guaranteed single-cycle access.
+  \item ECC on caches and memories for fault tolerance.
+  \item Dual-core lockstep mode for safety-critical applications (detect CPU faults).
+  \item Used in automotive (engine ECU), hard disk controllers, medical devices.
+\end{itemize}
+
+\subsection{Cortex-A: Application Profile}
+
+Full-featured processors for running complex OS:
+\begin{itemize}[nosep]
+  \item Memory Management Unit (MMU) with virtual memory (page tables, TLB).
+  \item Multi-level cache hierarchy (L1 I+D, L2, sometimes L3).
+  \item NEON SIMD, TrustZone security extensions.
+  \item Out-of-order execution, branch prediction, speculative execution.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{ARM Cortex family comparison matrix.}
+\label{tab:proc:armfamily}
+\begin{tabularx}{\textwidth}{l X X X X X}
+\toprule
+\textbf{Feature} & \textbf{M0+} & \textbf{M4F} & \textbf{M7} & \textbf{R5F} & \textbf{A53} \\
+\midrule
+ISA & Thumb & Thumb-2 & Thumb-2 & Thumb-2 & ARMv8-A \\
+Pipeline & 2-stage & 3-stage & 6-stage & 8-stage & In-order 8-stage \\
+MHz (typ.) & 48 & 168 & 480 & 800 & 1500 \\
+FPU & None & SP & SP+DP & SP+DP & SP+DP+NEON \\
+Cache & None & None & I+D, 64\,KB & I+D, TCM & L1+L2, MB scale \\
+MMU & No (MPU) & No (MPU) & No (MPU) & MPU & Full MMU \\
+DSP & No & Yes & Yes & Yes & NEON SIMD \\
+Area ($\mu$m$^2$) & 12K gates & 50K & 120K & 90K & 400K+ \\
+Power (mW/MHz) & 0.01 & 0.04 & 0.07 & 0.08 & 0.15 \\
+Use case & IoT sensor & Motor ctrl & Audio/HMI & Automotive & Smartphone \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Thumb-2 ISA Deep Dive}
+
+All Cortex-M processors use the Thumb-2 instruction set encoding, which mixes 16-bit and 32-bit instructions:
+\begin{itemize}
+  \item Most common ALU, branch, and load/store instructions fit in 16 bits (dense encoding).
+  \item Complex operations (barrel shift + ALU, conditional execution via IT block, bit-field manipulation) use 32-bit encodings.
+  \item The processor decodes instructions seamlessly; the programmer need not manually select between 16-bit and 32-bit.
+\end{itemize}
+
+\begin{insight}
+Thumb-2 achieves code density comparable to x86 (CISC) while maintaining RISC execution efficiency. A typical Thumb-2 binary is 25--35\% smaller than equivalent ARM (32-bit) code.
+\end{insight}
+
+\subsection{CMSIS Standard}
+
+The Cortex Microcontroller Software Interface Standard (CMSIS) provides:
+\begin{itemize}[nosep]
+  \item \textbf{CMSIS-Core:} Standard API for CPU registers, NVIC, SysTick (e.g., \texttt{NVIC\_SetPriority()}).
+  \item \textbf{CMSIS-DSP:} Optimised DSP library (FFT, FIR, matrix math) for Cortex-M4/M7.
+  \item \textbf{CMSIS-RTOS:} Generic RTOS API abstracting FreeRTOS, RTX, etc.
+  \item \textbf{CMSIS-Driver:} Standard peripheral driver interfaces.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{SHARC Processors (Analog Devices)}
+\label{sec:proc:sharc}
+
+\begin{definition}[SHARC]
+The Super Harvard Architecture Computer (SHARC) is a family of high-performance DSP processors by Analog Devices featuring a \textbf{dual-bus Harvard architecture} with separate program memory and two independent data memory buses (DM and PM data), enabling three simultaneous memory accesses per cycle.
+\end{definition}
+
+% TikZ: SHARC dual-bus Harvard architecture
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=2.5cm, minimum height=1cm, align=center, font=\small, fill=ee-blue!8},
+    bus/.style={draw, thick, fill=ee-amber!10, minimum width=0.3cm, minimum height=5cm},
+    arrow/.style={-{Stealth[length=2.5mm]}, thick},
+    biarrow/.style={{Stealth[length=2.5mm]}-{Stealth[length=2.5mm]}, thick}
+  ]
+  
+  % Core
+  \node[block, minimum width=4cm, minimum height=3cm, fill=ee-green!8] (core) at (0,0) {};
+  \node[above] at (core.north) {\small\textbf{SHARC Core}};
+  \node[block, minimum width=1.5cm, minimum height=0.7cm, fill=ee-amber!15] (alu) at (-0.8,0.4) {ALU};
+  \node[block, minimum width=1.5cm, minimum height=0.7cm, fill=ee-amber!15] (mac) at (0.8,0.4) {MAC};
+  \node[block, minimum width=1.5cm, minimum height=0.7cm, fill=ee-amber!15] (shift) at (-0.8,-0.5) {Shifter};
+  \node[block, minimum width=1.5cm, minimum height=0.7cm, fill=ee-blue!15] (seq) at (0.8,-0.5) {Sequencer};
+  
+  % Memory blocks
+  \node[block, fill=ee-green!12] (pmem) at (-5,0) {Program\\Memory\\(PM)};
+  \node[block, fill=ee-blue!12] (dm1) at (5,1) {Data Memory\\Block 0\\(DM)};
+  \node[block, fill=ee-red!12] (dm2) at (5,-1) {Data Memory\\Block 1\\(PM Data)};
+  
+  % I/O
+  \node[block, fill=ee-gray!12] (io) at (0,-3) {I/O Processor\\(DMA, Serial Ports, SPI)};
+  
+  % Buses
+  \draw[biarrow, ee-green!70!black] (pmem.east) -- (core.west) node[midway, above, font=\scriptsize] {PM Address Bus};
+  \draw[biarrow, ee-green!70!black] ([yshift=-3mm]pmem.east) -- ([yshift=-3mm]core.west) node[midway, below, font=\scriptsize] {PM Data Bus};
+  
+  \draw[biarrow, ee-blue!70!black] (core.east) -- (dm1.west) node[midway, above, font=\scriptsize] {DM Address Bus};
+  \draw[biarrow, ee-red!70!black] ([yshift=-5mm]core.east) -- (dm2.west) node[midway, below, font=\scriptsize] {DM Data Bus 2};
+  
+  \draw[biarrow] (core.south) -- (io.north);
+  
+  % Annotation
+  \node[font=\scriptsize\itshape, text=ee-gray, anchor=north west] at (-6.5, -2.5) {Three simultaneous memory accesses:\\1. Instruction fetch (PM bus)\\2. Data read (DM bus)\\3. Data read (PM data bus)};
+  
+\end{tikzpicture}
+\caption{SHARC super-Harvard architecture with dual data memory buses enabling three parallel memory accesses.}
+\label{fig:proc:sharc}
+\end{figure}
+
+Key SHARC features:
+\begin{itemize}
+  \item \textbf{SIMD mode:} Two identical compute units process independent data streams in parallel.
+  \item \textbf{VLIW execution:} A single 48-bit instruction word can specify a computation, two data moves, and a loop counter update simultaneously.
+  \item \textbf{Hardware circular buffers:} DAG (Data Address Generator) units with modular arithmetic for zero-overhead delay lines.
+  \item \textbf{Typical applications:} Professional audio processing (multi-channel mixing), software-defined radio, sonar/radar, real-time speech recognition.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Embedded Systems Programming}
+\label{sec:proc:programming}
+
+\subsection{Bare-Metal C Programming Idioms}
+
+\begin{important}[The \texttt{volatile} Keyword]
+Any variable that can change outside the normal program flow (hardware registers, ISR-shared variables, DMA buffers) \textbf{must} be declared \texttt{volatile}. Without it, the compiler may optimize away reads/writes, causing the program to miss hardware state changes.
+\end{important}
+
+\begin{lstlisting}[style=C, caption={Memory-mapped I/O: direct register access for STM32 GPIO.}]
+#include <stdint.h>
+
+// STM32F4 GPIO Port A base address
+#define GPIOA_BASE    0x40020000UL
+
+// Register offsets
+#define GPIO_MODER    0x00  // Mode register
+#define GPIO_ODR      0x14  // Output data register
+#define GPIO_IDR      0x10  // Input data register
+#define GPIO_BSRR     0x18  // Bit set/reset register
+
+// Direct register access via pointer cast
+#define REG(base, offset) \
+    (*(volatile uint32_t *)((base) + (offset)))
+
+void gpio_init_pa5_output(void) {
+    // Set PA5 as general-purpose output (MODER bits [11:10] = 01)
+    uint32_t moder = REG(GPIOA_BASE, GPIO_MODER);
+    moder &= ~(0x3U << (5 * 2));  // Clear bits 10:11
+    moder |=  (0x1U << (5 * 2));  // Set bit 10 (output mode)
+    REG(GPIOA_BASE, GPIO_MODER) = moder;
+}
+
+void gpio_toggle_pa5(void) {
+    REG(GPIOA_BASE, GPIO_ODR) ^= (1U << 5);
+}
+
+uint32_t gpio_read_pa0(void) {
+    return (REG(GPIOA_BASE, GPIO_IDR) >> 0) & 1U;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=C, caption={Struct overlay technique for register access.}]
+typedef struct {
+    volatile uint32_t MODER;    // 0x00
+    volatile uint32_t OTYPER;   // 0x04
+    volatile uint32_t OSPEEDR;  // 0x08
+    volatile uint32_t PUPDR;    // 0x0C
+    volatile uint32_t IDR;      // 0x10
+    volatile uint32_t ODR;      // 0x14
+    volatile uint32_t BSRR;     // 0x18
+    volatile uint32_t LCKR;     // 0x1C
+    volatile uint32_t AFR[2];   // 0x20-0x24
+} GPIO_TypeDef;
+
+#define GPIOA ((GPIO_TypeDef *) 0x40020000UL)
+#define GPIOB ((GPIO_TypeDef *) 0x40020400UL)
+
+// Usage: clean, readable, type-safe
+void led_on(void) {
+    GPIOA->BSRR = (1U << 5);   // Set PA5 (atomic)
+}
+
+void led_off(void) {
+    GPIOA->BSRR = (1U << 21);  // Reset PA5 (atomic)
+}
+\end{lstlisting}
+
+\subsection{Startup Code and Linker Scripts}
+
+When an ARM Cortex-M processor powers on or resets, it:
+\begin{enumerate}
+  \item Reads the initial Stack Pointer value from address \hex{0000\_0000}.
+  \item Reads the Reset Handler address from address \hex{0000\_0004}.
+  \item Jumps to the Reset Handler (startup code).
+\end{enumerate}
+
+The startup code (often called \texttt{crt0} or \texttt{startup\_stm32.s}) performs:
+
+\begin{lstlisting}[style=ARM, caption={Minimal startup assembly for ARM Cortex-M (crt0-like).}]
+    .syntax unified
+    .cpu cortex-m4
+    .thumb
+
+    .section .isr_vector, "a"
+    .word   _estack             ; Initial stack pointer
+    .word   Reset_Handler       ; Reset vector
+    .word   NMI_Handler         ; NMI
+    .word   HardFault_Handler   ; Hard fault
+    ; ... (remaining vectors)
+
+    .section .text
+    .global Reset_Handler
+    .type   Reset_Handler, %function
+Reset_Handler:
+    ; Copy .data section from Flash to SRAM
+    ldr     r0, =_sdata         ; Start of .data in SRAM
+    ldr     r1, =_edata         ; End of .data in SRAM
+    ldr     r2, =_sidata        ; Start of .data init values in Flash
+copy_data:
+    cmp     r0, r1
+    bge     zero_bss
+    ldr     r3, [r2], #4
+    str     r3, [r0], #4
+    b       copy_data
+
+    ; Zero-fill .bss section
+zero_bss:
+    ldr     r0, =_sbss
+    ldr     r1, =_ebss
+    mov     r2, #0
+fill_bss:
+    cmp     r0, r1
+    bge     call_main
+    str     r2, [r0], #4
+    b       fill_bss
+
+    ; Call main()
+call_main:
+    bl      SystemInit          ; Configure clocks (CMSIS)
+    bl      main                ; Enter C application
+    b       .                   ; Infinite loop if main returns
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Minimal linker script skeleton for ARM Cortex-M.}, basicstyle=\ttfamily\small, breaklines=true]
+/* Linker script for STM32F407 (512KB Flash, 128KB SRAM) */
+MEMORY
+{
+  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K
+  SRAM  (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+}
+
+_estack = ORIGIN(SRAM) + LENGTH(SRAM);  /* Top of stack */
+
+SECTIONS
+{
+  .isr_vector : {
+    KEEP(*(.isr_vector))
+  } > FLASH
+
+  .text : {
+    *(.text*)          /* Code */
+    *(.rodata*)        /* Read-only data (const) */
+  } > FLASH
+
+  _sidata = LOADADDR(.data);
+  .data : {
+    _sdata = .;
+    *(.data*)          /* Initialized global/static variables */
+    _edata = .;
+  } > SRAM AT> FLASH   /* VMA in SRAM, LMA in Flash */
+
+  .bss : {
+    _sbss = .;
+    *(.bss*)
+    *(COMMON)
+    _ebss = .;
+  } > SRAM
+
+  /* Stack and heap */
+  ._stack : {
+    . = ALIGN(8);
+    . = . + 4K;       /* 4KB stack */
+  } > SRAM
+}
+\end{lstlisting}
+
+\subsection{Memory Sections}
+
+\begin{table}[H]
+\centering
+\caption{Standard memory sections in an embedded C program.}
+\label{tab:proc:sections}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Section} & \textbf{Location} & \textbf{Contents} \\
+\midrule
+\texttt{.text} & Flash & Executable code (functions) \\
+\texttt{.rodata} & Flash & Read-only constants, string literals \\
+\texttt{.data} & Flash $\to$ SRAM & Initialized global/static variables (copied to SRAM at startup) \\
+\texttt{.bss} & SRAM & Uninitialized global/static variables (zeroed at startup) \\
+\texttt{.stack} & SRAM (top) & Runtime stack (grows downward on ARM) \\
+\texttt{.heap} & SRAM & Dynamic memory (if used; generally discouraged in embedded) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Cross-Compilation Toolchain}
+
+Embedded software is developed on a \emph{host} PC but runs on a \emph{target} MCU. Key tools:
+\begin{itemize}
+  \item \textbf{\texttt{arm-none-eabi-gcc}:} GCC cross-compiler for bare-metal ARM targets. Flags: \texttt{-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16}.
+  \item \textbf{\texttt{arm-none-eabi-objdump}:} Disassemble ELF binaries to inspect generated assembly.
+  \item \textbf{\texttt{arm-none-eabi-objcopy}:} Convert ELF to binary or Intel HEX format for flashing.
+  \item \textbf{\texttt{arm-none-eabi-size}:} Report code size (\texttt{.text}), data (\texttt{.data}), and BSS (\texttt{.bss}).
+\end{itemize}
+
+\begin{practicalNote}
+Always check the output of \texttt{arm-none-eabi-size} to verify your binary fits in the target's Flash and SRAM. Stack overflow is the most common cause of mysterious crashes in embedded systems.
+\end{practicalNote}
+
+% ----------------------------------------------------------------------------
+\section{Parallelism in Embedded Systems}
+\label{sec:proc:parallelism}
+
+\subsection{Instruction-Level Parallelism (ILP)}
+
+\begin{itemize}
+  \item \textbf{Superscalar execution:} Multiple instructions issued per cycle (Cortex-M7 is dual-issue). Hardware detects independent instructions and executes them in parallel.
+  \item \textbf{Out-of-order execution:} Instructions executed in data-dependency order, not program order (Cortex-A class). A reorder buffer (ROB) maintains in-order retirement.
+\end{itemize}
+
+\subsection{Task-Level Parallelism}
+
+An RTOS schedules multiple tasks that run on the same CPU core, achieving \emph{logical} parallelism through time-slicing. True parallelism requires multi-core processors (e.g., dual-core STM32H7, ESP32).
+
+\subsection{Hardware Parallelism}
+
+\begin{itemize}
+  \item \textbf{DMA controllers:} Transfer data between memory and peripherals without CPU involvement. The CPU configures the DMA transfer (source, destination, count) and is interrupted upon completion.
+  \item \textbf{Peripheral co-processors:} Some MCUs include dedicated hardware for CRC calculation, AES encryption, or DSP operations that run independently of the main CPU.
+\end{itemize}
+
+\subsection{SIMD for Embedded: ARM NEON}
+
+ARM NEON is a 128-bit SIMD extension available on Cortex-A and some DSP processors:
+
+\begin{lstlisting}[style=C, caption={NEON intrinsics example: vector addition of four 32-bit floats.}]
+#include <arm_neon.h>
+
+void vector_add(float *a, float *b, float *c, int n) {
+    for (int i = 0; i < n; i += 4) {
+        float32x4_t va = vld1q_f32(&a[i]);  // Load 4 floats
+        float32x4_t vb = vld1q_f32(&b[i]);
+        float32x4_t vc = vaddq_f32(va, vb); // SIMD add
+        vst1q_f32(&c[i], vc);               // Store result
+    }
+}
+\end{lstlisting}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:proc:examples}
+
+\begin{example}[Processor Selection]
+An application requires 16-channel 12-bit ADC sampling at 1\,MSPS total, a 256-tap FIR filter computed in real time, UART and SPI communication, and must cost under \$5. Select an appropriate processor and justify.
+
+\begin{solution}
+The FIR filter requires 256 MAC operations per sample. At 1\,MSPS, that is $256 \times 10^6 = 256\,$MMAC/s.
+
+An \textbf{ARM Cortex-M4F} (e.g., STM32F407 at 168\,MHz) is ideal:
+\begin{itemize}[nosep]
+  \item Single-cycle MAC via DSP instructions: theoretical throughput = 168\,MMAC/s. With overhead, approximately 100--120\,MMAC/s sustained.
+  \item For 256\,MMAC/s, we need to reduce the filter to 128 taps, or increase clock to 480\,MHz (Cortex-M7), or subsample.
+  \item Actually, with 16 channels each at 62.5\,kSPS: $256 \times 62{,}500 \times 16 = 256\,$MMAC/s. This exceeds M4 capability.
+  \item \textbf{Revised choice:} STM32H7 (Cortex-M7 at 480\,MHz, dual-issue): $\sim$400\,MMAC/s. Cost: $\sim$\$4. Includes 16-channel ADC.
+\end{itemize}
+\end{solution}
+\end{example}
+
+\begin{example}[Bitwise Register Manipulation]
+Configure STM32 GPIOB Pin 7 as output, push-pull, high-speed, no pull-up/pull-down, using direct register writes.
+
+\begin{solution}
+\begin{lstlisting}[style=C, numbers=none]
+// Enable GPIOB clock (RCC AHB1 peripheral clock enable register)
+*(volatile uint32_t *)(0x40023830) |= (1U << 1);  // RCC_AHB1ENR bit 1
+
+GPIO_TypeDef *GPIOB = (GPIO_TypeDef *)0x40020400UL;
+
+// MODER: bits [15:14] = 01 (general purpose output)
+GPIOB->MODER &= ~(3U << 14);
+GPIOB->MODER |=  (1U << 14);
+
+// OTYPER: bit 7 = 0 (push-pull)
+GPIOB->OTYPER &= ~(1U << 7);
+
+// OSPEEDR: bits [15:14] = 10 (high speed)
+GPIOB->OSPEEDR &= ~(3U << 14);
+GPIOB->OSPEEDR |=  (2U << 14);
+
+// PUPDR: bits [15:14] = 00 (no pull-up/pull-down)
+GPIOB->PUPDR &= ~(3U << 14);
+\end{lstlisting}
+\end{solution}
+\end{example}
+
+\begin{example}[Memory Section Analysis]
+Given the following C code, identify which memory section each variable resides in:
+\begin{lstlisting}[style=C, numbers=none]
+const char msg[] = "Hello";      // (a)
+int counter = 42;                // (b)
+static float buffer[256];        // (c)
+void foo(void) {
+    int local = 10;              // (d)
+    static int call_count = 0;   // (e)
+    call_count++;
+}
+\end{lstlisting}
+
+\begin{solution}
+\begin{enumerate}[label=(\alph*)]
+  \item \texttt{msg} is \texttt{const}: stored in \textbf{.rodata} (Flash).
+  \item \texttt{counter} is an initialised global: stored in \textbf{.data} (initialized value in Flash, copied to SRAM at startup).
+  \item \texttt{buffer} is an uninitialised static array: stored in \textbf{.bss} (SRAM, zeroed at startup).
+  \item \texttt{local} is a local variable: stored on the \textbf{stack} (SRAM).
+  \item \texttt{call\_count} is a static local with an initialiser: stored in \textbf{.data} (like any initialized static).
+\end{enumerate}
+\end{solution}
+\end{example}
+
+\begin{example}[Cross-Compilation Size Analysis]
+After compiling, \texttt{arm-none-eabi-size} reports:
+\begin{verbatim}
+   text    data     bss     dec     hex filename
+  12340     256    4096   16692    4134 firmware.elf
+\end{verbatim}
+The target MCU has 64\,KB Flash and 20\,KB SRAM. Will the firmware fit?
+
+\begin{solution}
+\textbf{Flash usage:} \texttt{.text} + \texttt{.data} = 12{,}340 + 256 = 12{,}596 bytes = 12.3\,KB. Flash has 64\,KB. \checkmark
+
+\textbf{SRAM usage:} \texttt{.data} + \texttt{.bss} = 256 + 4{,}096 = 4{,}352 bytes = 4.25\,KB. Plus stack (typically 1--4\,KB). Total $\approx$ 5--8\,KB. SRAM has 20\,KB. \checkmark
+
+The firmware fits comfortably with room for growth.
+
+Note: \texttt{.data} appears in \emph{both} calculations because its initial values are stored in Flash (LMA) and copied to SRAM (VMA).
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:proc:practice}
+
+\begin{exercise}[Processor Classification]
+Classify each processor below as MCU, DSP, Application Processor, FPGA, or ASIC: (a) STM32F103, (b) TMS320C6748, (c) Xilinx Artix-7, (d) Broadcom BCM2711 (Raspberry Pi 4), (e) Apple A16 Bionic, (f) ATmega328P, (g) ADSP-21489 SHARC.
+\end{exercise}
+
+\begin{exercise}[ARM Cortex Selection]
+For each application, recommend the most appropriate ARM Cortex profile (M, R, or A) and justify: (a) Smart thermostat with LCD display, (b) Automotive airbag controller, (c) Smartphone application processor, (d) Battery-powered BLE sensor beacon.
+\end{exercise}
+
+\begin{exercise}[Register Manipulation]
+Write C code using the struct overlay technique to:
+\begin{enumerate}[label=(\alph*)]
+  \item Configure PA0 as input with internal pull-up resistor on STM32.
+  \item Read the state of PA0 and return 1 if pressed (active low), 0 otherwise.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Linker Script Interpretation]
+Given a linker script that places \texttt{.isr\_vector} and \texttt{.text} in Flash starting at \hex{0800\_0000} and \texttt{.data} and \texttt{.bss} in SRAM starting at \hex{2000\_0000}: (a) What are the first 8 bytes at \hex{0800\_0000}? (b) What happens if \texttt{.data} LMA is not specified as Flash?
+\end{exercise}
+
+\begin{exercise}[SHARC vs.\ Cortex-M4 DSP]
+Compare the SHARC ADSP-21489 with the Cortex-M4F for implementing a 512-point complex FFT. Consider: MAC throughput, memory bandwidth, power consumption, and cost.
+\end{exercise}
+
+\begin{exercise}[Parallelism Analysis]
+A sensor fusion algorithm on Cortex-M4 reads accelerometer data via SPI (DMA), applies a Kalman filter (CPU), and transmits results via UART (DMA). Draw a timeline showing which hardware units are active during each phase and identify where parallelism is achieved.
+\end{exercise}
+
+\begin{exercise}[Code Size Optimization]
+Your firmware uses 63.5\,KB of a 64\,KB Flash. You need to add a new 2\,KB function. List three techniques to reduce code size without changing functionality.
+\end{exercise}

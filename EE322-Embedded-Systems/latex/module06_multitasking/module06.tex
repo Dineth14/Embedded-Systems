@@ -1,0 +1,524 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 6: Multitasking
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Multitasking}
+\label{ch:multitasking}
+\chaptermark{Module 6}
+
+\begin{moduleinfo}
+  \textbf{Module:} 6 \quad
+  \textbf{Lecture Hours:} 2 \quad
+  \textbf{ILOs Addressed:} ILO-4, ILO-5 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Explain the limitations of super-loop architectures and motivate multitasking.
+    \item Describe processes, threads, and task state transitions.
+    \item Explain context switching mechanics on ARM Cortex-M processors.
+    \item Implement inter-task communication using mutexes, semaphores, and queues.
+    \item Write FreeRTOS task code with synchronisation primitives.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{Imperative Programs --- Single Task Baseline}
+\label{sec:mt:superloop}
+
+\subsection{Super-Loop Architecture}
+
+The simplest embedded software architecture is the ``super-loop'' or ``bare-metal while(1)'':
+
+\begin{lstlisting}[style=C, caption={Typical super-loop architecture.}]
+int main(void) {
+    system_init();
+    while (1) {
+        read_sensors();
+        process_data();
+        update_display();
+        handle_communication();
+    }
+}
+\end{lstlisting}
+
+\textbf{Advantages:} Simple, no OS overhead, deterministic if well-designed, minimal RAM usage.
+
+\textbf{Disadvantages:}
+\begin{itemize}[nosep]
+  \item \textbf{Latency:} Response time to an event depends on the execution time of all other tasks in the loop. If \texttt{process\_data()} takes 50\,ms, sensor reading is delayed by up to 50\,ms.
+  \item \textbf{Priority:} All ``tasks'' have equal priority; no way to preempt a low-priority task for a high-priority event.
+  \item \textbf{Scalability:} Adding new functionality increases loop period and worsens latency.
+\end{itemize}
+
+\subsection{State Machine Approach}
+
+A structured alternative partitions each task into states, executing one state per loop iteration:
+
+\begin{lstlisting}[style=C, caption={State machine approach in super-loop.}]
+typedef enum { IDLE, SAMPLING, PROCESSING, DONE } sensor_state_t;
+sensor_state_t sensor_state = IDLE;
+
+void sensor_tick(void) {
+    switch (sensor_state) {
+        case IDLE:
+            if (timer_expired()) sensor_state = SAMPLING;
+            break;
+        case SAMPLING:
+            start_adc();
+            sensor_state = PROCESSING;
+            break;
+        case PROCESSING:
+            if (adc_done()) {
+                result = get_adc_value();
+                sensor_state = DONE;
+            }
+            break;
+        case DONE:
+            send_result(result);
+            sensor_state = IDLE;
+            break;
+    }
+}
+\end{lstlisting}
+
+This improves responsiveness (each state executes quickly) but makes code complex and fragile as the number of tasks grows.
+
+% ----------------------------------------------------------------------------
+\section{Processes and Threads}
+\label{sec:mt:threads}
+
+\begin{definition}[Process]
+A process is an instance of a running program with its own \textbf{private address space}. Processes are isolated from each other; inter-process communication (IPC) requires explicit mechanisms (pipes, shared memory, message queues). Context switching between processes is expensive because it involves switching page tables (on systems with an MMU).
+\end{definition}
+
+\begin{definition}[Thread]
+A thread is a lightweight unit of execution within a process. Threads within the same process \textbf{share the same address space} (code, global data, heap) but have \textbf{individual stacks and register contexts}. Context switching between threads is faster (no page table switch).
+\end{definition}
+
+In embedded RTOS terminology, a ``task'' is synonymous with a thread. Most embedded RTOSs (FreeRTOS, Zephyr, RTX) use a single address space with multiple tasks/threads.
+
+\begin{important}[Race Conditions]
+Because threads share memory, concurrent access to shared variables without synchronisation leads to \textbf{race conditions}---bugs where the program output depends on the unpredictable timing of thread execution. This is a primary source of embedded software defects.
+\end{important}
+
+\subsection{Thread States}
+
+A thread (task) transitions through the following states:
+
+% TikZ: Thread state transition diagram
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, thick, rounded corners=3pt, minimum width=2.2cm, minimum height=1cm, align=center, font=\small\bfseries},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\scriptsize, text=ee-gray, align=center}
+  ]
+  
+  \node[state, fill=ee-gray!15] (new) at (0,0) {New};
+  \node[state, fill=ee-amber!15] (ready) at (4,0) {Ready};
+  \node[state, fill=ee-green!15] (running) at (8,0) {Running};
+  \node[state, fill=ee-red!15] (blocked) at (8,-3.5) {Blocked};
+  \node[state, fill=ee-gray!30] (terminated) at (12,0) {Terminated};
+  
+  \draw[arrow] (new) -- (ready) node[midway, above, label] {Created /\\Admitted};
+  \draw[arrow] (ready) -- (running) node[midway, above, label] {Scheduled\\(Dispatch)};
+  \draw[arrow, bend left=20] (running) to node[midway, above, label] {Preempted /\\Yield} (ready);
+  \draw[arrow] (running) -- (blocked) node[midway, right, label] {Wait (mutex,\\semaphore,\\delay, I/O)};
+  \draw[arrow] (blocked) -| (ready) node[pos=0.3, below, label] {Event /\\Timeout};
+  \draw[arrow] (running) -- (terminated) node[midway, above, label] {Exit /\\Delete};
+  
+\end{tikzpicture}
+\caption{Thread (task) state transition diagram: New $\to$ Ready $\to$ Running $\leftrightarrow$ Blocked $\to$ Terminated.}
+\label{fig:mt:states}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{New:} Task created but not yet added to the scheduler.
+  \item \textbf{Ready:} Task is eligible to run; waiting for the CPU.
+  \item \textbf{Running:} Task is currently executing on the CPU (only one task at a time on single-core).
+  \item \textbf{Blocked:} Task is waiting for an event (mutex, semaphore, queue message, or delay). Cannot be scheduled.
+  \item \textbf{Terminated:} Task has completed or been deleted; resources freed.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Context Switching Mechanics}
+\label{sec:mt:context}
+
+\begin{definition}[Context Switch]
+A context switch saves the complete execution state (PC, SP, registers, status flags) of the currently running task and restores the saved state of the next task to be run. On ARM Cortex-M, this is typically performed by the \textbf{PendSV} exception handler.
+\end{definition}
+
+\subsection{What Is Saved}
+
+On ARM Cortex-M, the context consists of:
+\begin{itemize}[nosep]
+  \item \textbf{Hardware-saved (automatically on exception entry):} R0--R3, R12, LR, PC, xPSR (8 registers, 32 bytes).
+  \item \textbf{Software-saved (by PendSV handler):} R4--R11 (8 registers, 32 bytes). If FPU is used: S16--S31 + FPSCR (additional 68 bytes).
+\end{itemize}
+
+\subsection{ARM Cortex-M: PSP vs.\ MSP}
+
+ARM Cortex-M has two stack pointers:
+\begin{itemize}
+  \item \textbf{MSP (Main Stack Pointer):} Used by exception handlers and privileged code (the OS kernel).
+  \item \textbf{PSP (Process Stack Pointer):} Used by tasks in thread mode. Each task has its own PSP pointing to its private stack.
+\end{itemize}
+
+\subsection{PendSV Context Switch}
+
+\begin{lstlisting}[style=ARM, caption={Simplified PendSV handler for FreeRTOS-style context switch on Cortex-M4.}]
+    .global PendSV_Handler
+    .type PendSV_Handler, %function
+PendSV_Handler:
+    ; --- Save current task context ---
+    MRS     R0, PSP             ; Get current task's stack pointer
+    STMDB   R0!, {R4-R11}      ; Push R4-R11 onto task stack
+    ; (Hardware already pushed R0-R3, R12, LR, PC, xPSR)
+
+    ; Save updated PSP to current TCB
+    LDR     R1, =pxCurrentTCB
+    LDR     R2, [R1]            ; R2 = address of current TCB
+    STR     R0, [R2]            ; TCB->pxTopOfStack = R0
+
+    ; --- Select next task ---
+    PUSH    {R3, LR}           
+    BL      vTaskSwitchContext  ; Call scheduler to pick next task
+    POP     {R3, LR}
+
+    ; --- Restore next task context ---
+    LDR     R1, =pxCurrentTCB
+    LDR     R2, [R1]            ; R2 = address of next TCB
+    LDR     R0, [R2]            ; R0 = next task's stack pointer
+
+    LDMIA   R0!, {R4-R11}      ; Pop R4-R11 from next task's stack
+    MSR     PSP, R0             ; Set PSP to next task's stack
+
+    BX      LR                  ; Return (hardware restores R0-R3 etc.)
+\end{lstlisting}
+
+\subsection{Context Switch Overhead}
+
+On Cortex-M4 at \freq{168}{MHz}:
+\begin{itemize}[nosep]
+  \item Hardware register stacking: 12 cycles.
+  \item Software save (R4--R11): 8 cycles (STMDB).
+  \item Scheduler call: 20--50 cycles (depends on ready queue implementation).
+  \item Software restore: 8 cycles (LDMIA).
+  \item Hardware unstacking: 12 cycles.
+  \item \textbf{Total:} $\approx 60$--90 cycles $= 0.36$--$0.54\,\mu$s at 168\,MHz.
+\end{itemize}
+
+\begin{practicalNote}
+FreeRTOS typically measures 80--100 cycles per context switch on Cortex-M4. With FPU context (lazy stacking disabled), this increases to $\sim$180 cycles. Using FPU lazy stacking (default in FreeRTOS), the FPU context is only saved when a second task uses the FPU.
+\end{practicalNote}
+
+% ----------------------------------------------------------------------------
+\section{Inter-Task Communication}
+\label{sec:mt:ipc}
+
+\subsection{Shared Memory with Mutexes}
+
+\begin{definition}[Mutex]
+A mutex (mutual exclusion) is a synchronisation primitive that ensures only one task can access a shared resource at a time. A task must \emph{acquire} the mutex before accessing the resource and \emph{release} it afterward.
+\end{definition}
+
+\textbf{Deadlock:} Occurs when two or more tasks are each waiting for a mutex held by another, forming a circular dependency. Example: Task A holds Mutex 1 and waits for Mutex 2; Task B holds Mutex 2 and waits for Mutex 1.
+
+\textbf{Priority inversion:} A high-priority task is blocked waiting for a mutex held by a low-priority task, while a medium-priority task preempts the low-priority task, effectively inverting priorities.
+
+\textbf{Priority inheritance:} Solution where the mutex-holding low-priority task temporarily inherits the priority of the highest-priority waiting task, preventing the medium-priority task from preempting it.
+
+% TikZ: Priority inversion timeline
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.6, every node/.style={font=\scriptsize}]
+  
+  % Time axis
+  \draw[-{Stealth}, thick] (0,0) -- (18,0) node[right] {Time};
+  \foreach \t in {0,...,17} {
+    \draw (\t, -0.1) -- (\t, 0.1);
+    \node[below] at (\t, -0.1) {\t};
+  }
+  
+  % Task labels
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 4) {H (High)};
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 2.5) {M (Med)};
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 1) {L (Low)};
+  
+  % === Without Priority Inheritance ===
+  \node[font=\small\bfseries, text=ee-red] at (8.5, 5.5) {Without Priority Inheritance};
+  
+  % L runs and acquires mutex at t=0
+  \fill[ee-green!30] (0,0.5) rectangle (2,1.5);
+  \node at (1, 1) {L+M};
+  
+  % H arrives at t=2, blocked on mutex
+  \fill[ee-red!20] (2,3.5) rectangle (8,4.5);
+  \node[text=ee-red] at (5, 4) {H BLOCKED};
+  
+  % M preempts L at t=2
+  \fill[ee-amber!30] (2,2) rectangle (7,3);
+  \node at (4.5, 2.5) {M runs};
+  
+  % L resumes at t=7, finishes at t=8
+  \fill[ee-green!30] (7,0.5) rectangle (8,1.5);
+  \node at (7.5, 1) {L};
+  
+  % H finally runs at t=8
+  \fill[ee-blue!30] (8,3.5) rectangle (11,4.5);
+  \node at (9.5, 4) {H runs};
+  
+  % Inversion period
+  \draw[{Stealth}-{Stealth}, ee-red, thick] (2,5) -- (8,5);
+  \node[above, text=ee-red] at (5, 5) {Priority Inversion!};
+  
+\end{tikzpicture}
+\caption{Priority inversion: high-priority task H is blocked while medium-priority task M runs.}
+\label{fig:mt:prioinversion}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.6, every node/.style={font=\scriptsize}]
+  
+  \draw[-{Stealth}, thick] (0,0) -- (14,0) node[right] {Time};
+  \foreach \t in {0,...,13} {
+    \draw (\t, -0.1) -- (\t, 0.1);
+    \node[below] at (\t, -0.1) {\t};
+  }
+  
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 4) {H (High)};
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 2.5) {M (Med)};
+  \node[anchor=east, font=\small\bfseries] at (-0.5, 1) {L (Low)};
+  
+  \node[font=\small\bfseries, text=ee-green!70!black] at (6, 5.5) {With Priority Inheritance};
+  
+  % L runs and acquires mutex
+  \fill[ee-green!30] (0,0.5) rectangle (2,1.5);
+  \node at (1, 1) {L+M};
+  
+  % H arrives at t=2, L inherits H's priority
+  \fill[ee-green!50] (2,0.5) rectangle (4,1.5);
+  \node at (3, 1) {L(H)};
+  \node[above, text=ee-green!70!black, font=\tiny] at (3, 1.6) {Inherited};
+  
+  % M cannot preempt (L has H priority)
+  \fill[ee-red!15] (2,3.5) rectangle (4,4.5);
+  \node at (3, 4) {H wait};
+  
+  % L releases mutex at t=4, H runs
+  \fill[ee-blue!30] (4,3.5) rectangle (7,4.5);
+  \node at (5.5, 4) {H runs};
+  
+  % M runs after H finishes
+  \fill[ee-amber!30] (7,2) rectangle (10,3);
+  \node at (8.5, 2.5) {M runs};
+  
+  % Bounded inversion
+  \draw[{Stealth}-{Stealth}, ee-green!70!black, thick] (2,5) -- (4,5);
+  \node[above, text=ee-green!70!black] at (3, 5) {Bounded};
+  
+\end{tikzpicture}
+\caption{Priority inheritance: L inherits H's priority, preventing M from causing unbounded inversion.}
+\label{fig:mt:prioinherit}
+\end{figure}
+
+\subsection{Message Passing: Queues and Mailboxes}
+
+Queues provide safe, buffered communication between tasks without shared memory:
+\begin{itemize}[nosep]
+  \item \textbf{FIFO queue:} First-In-First-Out. Producer enqueues, consumer dequeues.
+  \item \textbf{Priority queue:} Messages dequeued by priority rather than arrival order.
+  \item \textbf{Mailbox:} Single-item queue (the latest message overwrites the previous one).
+\end{itemize}
+
+% TikZ: producer-consumer with queue
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    task/.style={draw, thick, rounded corners=2pt, minimum width=2cm, minimum height=1.5cm, align=center, font=\small},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+  ]
+  
+  \node[task, fill=ee-green!15] (producer) at (0,0) {\textbf{Producer}\\Task};
+  
+  % Queue (series of boxes)
+  \foreach \i in {0,...,4} {
+    \node[draw, thick, minimum width=0.8cm, minimum height=0.8cm, fill=ee-blue!10] (q\i) at ({3.5+\i*0.9}, 0) {};
+  }
+  \node[above, font=\small\bfseries] at (5.3,0.6) {Queue (FIFO)};
+  \node[font=\tiny] at (3.5,0) {D4};
+  \node[font=\tiny] at (4.4,0) {D3};
+  \node[font=\tiny] at (5.3,0) {D2};
+  \node[font=\tiny, text=ee-gray] at (6.2,0) {};
+  \node[font=\tiny, text=ee-gray] at (7.1,0) {};
+  
+  \node[task, fill=ee-amber!15] (consumer) at (10,0) {\textbf{Consumer}\\Task};
+  
+  \draw[arrow, ee-green!70!black] (producer) -- (q0) node[midway, above, font=\scriptsize] {xQueueSend()};
+  \draw[arrow, ee-amber!70!black] (q4) -- (consumer) node[midway, above, font=\scriptsize] {xQueueReceive()};
+  
+  % Blocking annotations
+  \node[below=0.5cm of q2, font=\scriptsize\itshape, text=ee-gray] {Queue full $\Rightarrow$ Producer blocks\\Queue empty $\Rightarrow$ Consumer blocks};
+  
+\end{tikzpicture}
+\caption{Producer-consumer pattern using a FIFO queue for inter-task communication.}
+\label{fig:mt:queue}
+\end{figure}
+
+\subsection{Semaphores}
+
+\begin{itemize}
+  \item \textbf{Binary semaphore:} Value is 0 or 1. Used for signalling between tasks (e.g., ISR signals task that data is ready). Similar to mutex but does not support priority inheritance.
+  \item \textbf{Counting semaphore:} Value is 0 to $N$. Used to control access to a pool of $N$ identical resources or to count events.
+\end{itemize}
+
+\subsection{Event Flags / Event Groups}
+
+Event groups allow a task to wait for a combination of events (logical AND or OR of multiple flags). FreeRTOS: \texttt{xEventGroupWaitBits()} blocks until the specified combination of bits is set.
+
+% ----------------------------------------------------------------------------
+\section{FreeRTOS as a Concrete Example}
+\label{sec:mt:freertos}
+
+\begin{lstlisting}[style=C, caption={FreeRTOS: two tasks sharing a resource with a mutex.}]
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+SemaphoreHandle_t xMutex;
+volatile uint32_t shared_counter = 0;
+
+void vTaskIncrement(void *pvParameters) {
+    (void)pvParameters;
+    for (;;) {
+        if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+            // Critical section: safely modify shared resource
+            shared_counter++;
+            xSemaphoreGive(xMutex);
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));  // Delay 100 ms
+    }
+}
+
+void vTaskDisplay(void *pvParameters) {
+    (void)pvParameters;
+    for (;;) {
+        if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+            uint32_t val = shared_counter;
+            xSemaphoreGive(xMutex);
+            // Use val safely outside critical section
+            printf("Counter: %lu\n", val);
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+int main(void) {
+    xMutex = xSemaphoreCreateMutex();
+
+    xTaskCreate(vTaskIncrement, "Inc",  256, NULL, 2, NULL);
+    xTaskCreate(vTaskDisplay,   "Disp", 256, NULL, 1, NULL);
+
+    vTaskStartScheduler();  // Never returns
+    for (;;);
+}
+\end{lstlisting}
+
+Key FreeRTOS APIs:
+\begin{itemize}[nosep]
+  \item \texttt{xTaskCreate(function, name, stackSize, params, priority, handle)}: Creates a new task.
+  \item \texttt{xSemaphoreCreateMutex()}: Creates a mutex with priority inheritance.
+  \item \texttt{xQueueCreate(length, itemSize)}: Creates a queue.
+  \item \texttt{xEventGroupCreate()}: Creates an event group.
+  \item \texttt{vTaskDelay(ticks)}: Blocks the task for the specified number of tick periods.
+  \item \texttt{vTaskDelayUntil(\&xLastWakeTime, period)}: Precise periodic execution.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:mt:examples}
+
+\begin{example}[Context Switch Time Budget]
+An RTOS runs on Cortex-M4 at \freq{168}{MHz} with a 1\,ms tick period. If context switching takes 100 cycles, what percentage of CPU time is consumed by context switches if 10 switches occur per tick period?
+
+\begin{solution}
+Cycles per tick: $168 \times 10^6 \times 10^{-3} = 168{,}000$ cycles.
+
+Cycles for switching: $10 \times 100 = 1{,}000$ cycles.
+
+Overhead: $\frac{1{,}000}{168{,}000} = 0.595\%$.
+
+This is negligible---less than 1\% overhead, which is why RTOS-based multitasking is practical.
+\end{solution}
+\end{example}
+
+\begin{example}[Deadlock Identification]
+Two tasks access two shared resources (UART and SPI) protected by mutexes A and B:
+\begin{lstlisting}[style=C, numbers=none]
+// Task 1:            // Task 2:
+take(mutexA);         take(mutexB);
+take(mutexB);         take(mutexA);
+// use UART+SPI       // use SPI+UART
+give(mutexB);         give(mutexA);
+give(mutexA);         give(mutexB);
+\end{lstlisting}
+Identify the deadlock potential and propose a fix.
+
+\begin{solution}
+\textbf{Deadlock scenario:} Task 1 acquires mutexA, then is preempted. Task 2 acquires mutexB. Now Task 1 waits for mutexB (held by Task 2) and Task 2 waits for mutexA (held by Task 1). Circular wait = deadlock.
+
+\textbf{Fix:} Impose a global lock ordering: always acquire mutexA before mutexB. Both tasks use the same order:
+\begin{lstlisting}[style=C, numbers=none]
+// Both tasks:
+take(mutexA);
+take(mutexB);
+// use resources
+give(mutexB);
+give(mutexA);
+\end{lstlisting}
+This eliminates the circular dependency.
+\end{solution}
+\end{example}
+
+\begin{example}[Stack Size Estimation]
+A FreeRTOS task on Cortex-M4 calls functions with a maximum call depth of 6 levels, each using 32 bytes of local variables. The context save frame is 64 bytes (R0--R11, LR, PC, xPSR, padding). Estimate the minimum stack size.
+
+\begin{solution}
+\begin{itemize}[nosep]
+  \item Context frame: 64 bytes
+  \item Function call overhead (return address per level): $6 \times 4 = 24$ bytes
+  \item Local variables: $6 \times 32 = 192$ bytes
+  \item Safety margin (recommended 25\%): $0.25 \times 280 = 70$ bytes
+\end{itemize}
+
+Total: $64 + 24 + 192 + 70 = 350$ bytes. Round up to \textbf{384 bytes} (96 words).
+
+In FreeRTOS, stack size is specified in words: \texttt{xTaskCreate(..., 96, ...)}.
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:mt:practice}
+
+\begin{exercise}[Super-Loop Timing Analysis]
+A super-loop executes three tasks: Task A (2\,ms), Task B (5\,ms), Task C (3\,ms). Calculate the worst-case response time for each task. How would adding a 50\,ms Task D affect Task A's response time?
+\end{exercise}
+
+\begin{exercise}[Process vs.\ Thread]
+Explain why embedded RTOSs for Cortex-M (which lack an MMU) use threads rather than processes. What security/safety risk does a single address space introduce?
+\end{exercise}
+
+\begin{exercise}[Priority Inversion Scenario]
+Three tasks: H (priority 3), M (priority 2), L (priority 1). L holds a mutex needed by H. Draw Gantt charts showing: (a) execution without priority inheritance, (b) execution with priority inheritance. Assume L needs 4 time units in the critical section and M arrives at time 2.
+\end{exercise}
+
+\begin{exercise}[FreeRTOS Queue Usage]
+Write FreeRTOS code for a producer task that reads ADC values every 10\,ms and sends them to a consumer task via a 32-element queue. The consumer calculates a running average and prints it every 500\,ms.
+\end{exercise}
+
+\begin{exercise}[Stack Overflow Detection]
+Describe two methods FreeRTOS provides for detecting stack overflows at runtime. What are the limitations of each method? How would you determine the optimal stack size for a task during development?
+\end{exercise}

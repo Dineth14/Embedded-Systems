@@ -1,0 +1,744 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 9: Modeling of Embedded Systems
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Modeling of Embedded Systems}
+\label{ch:modeling}
+\chaptermark{Module 9}
+
+\begin{moduleinfo}
+  \textbf{Module:} 9 \quad
+  \textbf{Lecture Hours:} 4 \quad
+  \textbf{ILOs Addressed:} ILO-7, ILO-8 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Draw UML diagrams (class, sequence, state machine) for embedded systems.
+    \item Design finite state machines (FSMs) and hierarchical state machines (HSMs).
+    \item Implement FSMs in C using switch-case and function pointer table approaches.
+    \item Model reactive systems using state flow diagrams.
+    \item Discuss model-driven development tools (Simulink/Stateflow, Rhapsody).
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{UML for Embedded Systems}
+\label{sec:mod:uml}
+
+The Unified Modeling Language (UML) provides standardised diagrams for documenting software architecture and behaviour. Embedded systems commonly use:
+
+\begin{itemize}[nosep]
+  \item \textbf{Class diagrams:} Show structure (modules, data types, relationships).
+  \item \textbf{Sequence diagrams:} Show interaction (message flow between objects over time).
+  \item \textbf{State machine diagrams:} Show behaviour (states and transitions).
+  \item \textbf{Activity diagrams:} Show workflow/algorithms.
+\end{itemize}
+
+\subsection{UML Class Diagram}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    class/.style={draw, thick, minimum width=3.5cm, rectangle split, rectangle split parts=3, font=\small, align=left},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+  ]
+  
+  \node[class, fill=ee-blue!10] (sensor) at (0,0) {
+    \textbf{<<interface>>}\\TemperatureSensor
+    \nodepart{second}
+    \nodepart{third}
+    +readTemp(): float\\
+    +calibrate(): void
+  };
+  
+  \node[class, fill=ee-green!10] (adc) at (0,-4) {
+    \textbf{ADC\_TempSensor}
+    \nodepart{second}
+    -channel: uint8\_t\\
+    -offset: float
+    \nodepart{third}
+    +readTemp(): float\\
+    +calibrate(): void
+  };
+  
+  \node[class, fill=ee-green!10] (i2c) at (5.5,-4) {
+    \textbf{I2C\_TempSensor}
+    \nodepart{second}
+    -address: uint8\_t\\
+    -bus: I2C\_Handle
+    \nodepart{third}
+    +readTemp(): float\\
+    +calibrate(): void
+  };
+  
+  \node[class, fill=ee-amber!10] (ctrl) at (8,0) {
+    \textbf{TempController}
+    \nodepart{second}
+    -setpoint: float\\
+    -Kp, Ki, Kd: float\\
+    -state: ControlState
+    \nodepart{third}
+    +update(): void\\
+    +setTarget(float): void\\
+    +getState(): ControlState
+  };
+  
+  % Inheritance
+  \draw[-{Triangle[open, length=3mm]}, thick] (adc.north) -- (sensor.south -| adc.north);
+  \draw[-{Triangle[open, length=3mm]}, thick] (i2c.north) -- (sensor.south -| i2c.north);
+  
+  % Association
+  \draw[arrow] (ctrl.west) -- (sensor.east) node[midway, above, font=\scriptsize] {uses 1..*};
+  
+\end{tikzpicture}
+\caption{UML class diagram: temperature controller with sensor abstraction.}
+\label{fig:mod:classdiag}
+\end{figure}
+
+\subsection{UML Sequence Diagram}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    actor/.style={font=\small\bfseries},
+    lifeline/.style={dashed, thin, gray},
+    msg/.style={-{Stealth[length=2.5mm]}, thick},
+    rmsg/.style={-{Stealth[length=2.5mm]}, thick, dashed},
+    act/.style={draw, thick, fill=ee-blue!10, minimum width=0.4cm}
+  ]
+  
+  % Actors
+  \node[actor, draw, thick, fill=ee-blue!10, minimum width=1.5cm, minimum height=0.7cm] (timer) at (0,0) {Timer ISR};
+  \node[actor, draw, thick, fill=ee-green!10, minimum width=1.5cm, minimum height=0.7cm] (ctrl) at (4,0) {Controller};
+  \node[actor, draw, thick, fill=ee-amber!10, minimum width=1.5cm, minimum height=0.7cm] (adc) at (8,0) {ADC Driver};
+  \node[actor, draw, thick, fill=ee-red!10, minimum width=1.5cm, minimum height=0.7cm] (pwm) at (12,0) {PWM Driver};
+  
+  % Lifelines
+  \draw[lifeline] (0, -0.4) -- (0, -9);
+  \draw[lifeline] (4, -0.4) -- (4, -9);
+  \draw[lifeline] (8, -0.4) -- (8, -9);
+  \draw[lifeline] (12, -0.4) -- (12, -9);
+  
+  % Activation bars
+  \fill[ee-blue!15] (-0.15, -1) rectangle (0.15, -2);
+  \fill[ee-green!15] (3.85, -1.5) rectangle (4.15, -7.5);
+  \fill[ee-amber!15] (7.85, -2.5) rectangle (8.15, -4);
+  \fill[ee-red!15] (11.85, -5.5) rectangle (12.15, -7);
+  
+  % Messages
+  \draw[msg] (0, -1) -- (4, -1.5) node[midway, above, font=\scriptsize, sloped] {tick\_event()};
+  \draw[msg] (4, -2.5) -- (8, -3) node[midway, above, font=\scriptsize, sloped] {startConversion()};
+  \draw[rmsg] (8, -3.8) -- (4, -4.3) node[midway, above, font=\scriptsize, sloped] {temperature};
+  \draw[msg, ee-green!70!black] (4, -4.8) -- (4, -5.3) node[midway, right, font=\scriptsize] {computePID()};
+  \draw[msg] (4, -5.5) -- (12, -6) node[midway, above, font=\scriptsize, sloped] {setDutyCycle(output)};
+  \draw[rmsg] (12, -6.8) -- (4, -7.3) node[midway, above, font=\scriptsize, sloped] {ack};
+  
+  % Time labels
+  \node[font=\tiny, text=ee-gray] at (-1.5, -1) {every 10ms};
+  
+\end{tikzpicture}
+\caption{UML sequence diagram: periodic temperature control loop.}
+\label{fig:mod:seqdiag}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{Finite State Machines (FSMs)}
+\label{sec:mod:fsm}
+
+\begin{definition}[Finite State Machine]
+A finite state machine is a mathematical model of computation defined by a tuple $(S, \Sigma, \delta, s_0, F)$:
+\begin{itemize}[nosep]
+  \item $S$: finite set of states
+  \item $\Sigma$: finite set of input events (alphabet)
+  \item $\delta: S \times \Sigma \to S$: transition function
+  \item $s_0 \in S$: initial state
+  \item $F \subseteq S$: set of accepting/final states (optional for embedded FSMs)
+\end{itemize}
+\end{definition}
+
+\subsection{Mealy vs.\ Moore Machines}
+
+\begin{itemize}
+  \item \textbf{Moore machine:} Output depends only on the current state. Actions are associated with states (entry/exit actions).
+  \item \textbf{Mealy machine:} Output depends on the current state \emph{and} the input event. Actions are associated with transitions.
+\end{itemize}
+
+\subsection{Example: Traffic Light Controller FSM}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, thick, circle, minimum size=2cm, font=\small\bfseries, align=center},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\scriptsize, align=center}
+  ]
+  
+  \node[state, fill=ee-green!20] (green) at (0,0) {GREEN\\[2pt]{\tiny 30s}};
+  \node[state, fill=ee-amber!30] (yellow) at (5,0) {YELLOW\\[2pt]{\tiny 5s}};
+  \node[state, fill=ee-red!20] (red) at (10,0) {RED\\[2pt]{\tiny 30s}};
+  \node[state, fill=ee-red!15, dashed] (flash) at (5,-4) {FLASH\\RED\\[2pt]{\tiny emergency}};
+  
+  % Initial state
+  \fill[black] (-2.5,0) circle (3pt);
+  \draw[arrow] (-2.5,0) -- (green);
+  
+  % Transitions
+  \draw[arrow] (green) -- (yellow) node[midway, above, label] {timeout/\\turn on yellow};
+  \draw[arrow] (yellow) -- (red) node[midway, above, label] {timeout/\\turn on red};
+  \draw[arrow, bend right=25] (red) to node[midway, below, label] {timeout/\\turn on green} (green);
+  
+  % Emergency transitions
+  \draw[arrow, ee-red] (green) -- (flash) node[midway, left, label, text=ee-red] {emergency};
+  \draw[arrow, ee-red] (yellow) -- (flash) node[midway, right, label, text=ee-red] {emergency};
+  \draw[arrow, ee-red] (red) -- (flash) node[midway, right, label, text=ee-red] {emergency};
+  \draw[arrow, ee-green!70!black, bend left=30] (flash) to node[midway, below, label] {clear/\\resume normal} (red);
+  
+\end{tikzpicture}
+\caption{FSM for a traffic light controller with emergency override.}
+\label{fig:mod:trafficfsm}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{FSM Implementation in C}
+\label{sec:mod:fsmimpl}
+
+\subsection{Switch-Case Implementation}
+
+The most common and straightforward approach:
+
+\begin{lstlisting}[style=C, caption={Switch-case FSM implementation for the traffic light controller.}]
+typedef enum {
+    STATE_GREEN,
+    STATE_YELLOW,
+    STATE_RED,
+    STATE_FLASH_RED
+} traffic_state_t;
+
+typedef enum {
+    EVT_TIMEOUT,
+    EVT_EMERGENCY,
+    EVT_CLEAR
+} traffic_event_t;
+
+static traffic_state_t current_state = STATE_GREEN;
+
+void traffic_fsm(traffic_event_t event) {
+    switch (current_state) {
+        case STATE_GREEN:
+            if (event == EVT_TIMEOUT) {
+                set_light(YELLOW);
+                start_timer(5000);  // 5 seconds
+                current_state = STATE_YELLOW;
+            } else if (event == EVT_EMERGENCY) {
+                set_light(FLASH_RED);
+                current_state = STATE_FLASH_RED;
+            }
+            break;
+
+        case STATE_YELLOW:
+            if (event == EVT_TIMEOUT) {
+                set_light(RED);
+                start_timer(30000);  // 30 seconds
+                current_state = STATE_RED;
+            } else if (event == EVT_EMERGENCY) {
+                set_light(FLASH_RED);
+                current_state = STATE_FLASH_RED;
+            }
+            break;
+
+        case STATE_RED:
+            if (event == EVT_TIMEOUT) {
+                set_light(GREEN);
+                start_timer(30000);
+                current_state = STATE_GREEN;
+            } else if (event == EVT_EMERGENCY) {
+                set_light(FLASH_RED);
+                current_state = STATE_FLASH_RED;
+            }
+            break;
+
+        case STATE_FLASH_RED:
+            if (event == EVT_CLEAR) {
+                set_light(RED);
+                start_timer(30000);
+                current_state = STATE_RED;
+            }
+            break;
+    }
+}
+\end{lstlisting}
+
+\textbf{Pros:} Simple, easy to understand, compiler can optimise well.
+
+\textbf{Cons:} Does not scale well for many states/events; no separation of state logic from transition logic.
+
+\subsection{Function Pointer Table Implementation}
+
+A table-driven approach that separates the FSM structure from the action logic:
+
+\begin{lstlisting}[style=C, caption={Table-driven FSM using function pointers.}]
+#include <stdint.h>
+
+typedef enum { ST_GREEN, ST_YELLOW, ST_RED, ST_FLASH, ST_COUNT } state_t;
+typedef enum { EV_TIMEOUT, EV_EMERGENCY, EV_CLEAR, EV_COUNT } event_t;
+
+typedef struct {
+    state_t next_state;
+    void (*action)(void);
+} transition_t;
+
+// Action functions
+static void act_to_yellow(void)  { set_light(YELLOW);    start_timer(5000);  }
+static void act_to_red(void)     { set_light(RED);       start_timer(30000); }
+static void act_to_green(void)   { set_light(GREEN);     start_timer(30000); }
+static void act_to_flash(void)   { set_light(FLASH_RED); stop_timer();       }
+static void act_none(void)       { /* no action */ }
+
+// Transition table: [current_state][event] -> {next_state, action}
+static const transition_t fsm_table[ST_COUNT][EV_COUNT] = {
+    /* ST_GREEN  */ {
+        [EV_TIMEOUT]   = { ST_YELLOW, act_to_yellow },
+        [EV_EMERGENCY] = { ST_FLASH,  act_to_flash  },
+        [EV_CLEAR]     = { ST_GREEN,  act_none       },
+    },
+    /* ST_YELLOW */ {
+        [EV_TIMEOUT]   = { ST_RED,    act_to_red    },
+        [EV_EMERGENCY] = { ST_FLASH,  act_to_flash  },
+        [EV_CLEAR]     = { ST_YELLOW, act_none       },
+    },
+    /* ST_RED    */ {
+        [EV_TIMEOUT]   = { ST_GREEN,  act_to_green  },
+        [EV_EMERGENCY] = { ST_FLASH,  act_to_flash  },
+        [EV_CLEAR]     = { ST_RED,    act_none       },
+    },
+    /* ST_FLASH  */ {
+        [EV_TIMEOUT]   = { ST_FLASH,  act_none       },
+        [EV_EMERGENCY] = { ST_FLASH,  act_none       },
+        [EV_CLEAR]     = { ST_RED,    act_to_red    },
+    },
+};
+
+static state_t current_state = ST_GREEN;
+
+void fsm_dispatch(event_t event) {
+    const transition_t *t = &fsm_table[current_state][event];
+    if (t->action != NULL) {
+        t->action();
+    }
+    current_state = t->next_state;
+}
+\end{lstlisting}
+
+\textbf{Pros:} Clean separation; adding states/events only requires adding table entries; data-driven design.
+
+\textbf{Cons:} Slightly more RAM/Flash for the table; all transition functions must have the same signature.
+
+% ----------------------------------------------------------------------------
+\section{Hierarchical State Machines (HSMs)}
+\label{sec:mod:hsm}
+
+\begin{definition}[Hierarchical State Machine]
+An HSM (also called a statechart, Harel statechart) extends flat FSMs with:
+\begin{itemize}[nosep]
+  \item \textbf{Nested states:} A superstate contains substates. Transitions common to all substates can be defined once at the superstate level.
+  \item \textbf{Entry/exit actions:} Actions executed when entering or leaving a state.
+  \item \textbf{History states:} Remember the last active substate when re-entering a superstate.
+  \item \textbf{Orthogonal regions:} Concurrent substates within a superstate.
+\end{itemize}
+\end{definition}
+
+\subsection{Statechart Example: Motor Controller}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, thick, rounded corners=4pt, minimum width=2cm, minimum height=0.9cm, font=\small\bfseries, align=center},
+    superstate/.style={draw, thick, rounded corners=8pt, dashed, inner sep=12pt},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\scriptsize, align=center}
+  ]
+  
+  % Superstate: Operational
+  \begin{scope}
+    \node[superstate, fill=ee-green!5, minimum width=9.5cm, minimum height=5.5cm] (op) at (4.5,-2) {};
+    \node[font=\small\bfseries, anchor=north west, text=ee-green!70!black] at (op.north west) {\quad Operational};
+  \end{scope}
+  
+  % States inside Operational
+  \node[state, fill=ee-blue!15] (idle) at (1,-0.8) {Idle};
+  \node[state, fill=ee-green!20] (accel) at (5,-0.8) {Accelerating};
+  \node[state, fill=ee-amber!20] (cruise) at (5,-3) {Cruising};
+  \node[state, fill=ee-green!15] (decel) at (1,-3) {Decelerating};
+  
+  % State: Fault
+  \node[state, fill=ee-red!20] (fault) at (11,-2) {Fault};
+  
+  % Initial
+  \fill[black] (-1, -0.8) circle (3pt);
+  \draw[arrow] (-1,-0.8) -- (idle);
+  
+  % Internal transitions
+  \draw[arrow] (idle) -- (accel) node[midway, above, label] {start};
+  \draw[arrow] (accel) -- (cruise) node[midway, right, label] {target\\reached};
+  \draw[arrow] (cruise) -- (decel) node[midway, below, label] {stop\\command};
+  \draw[arrow] (decel) -- (idle) node[midway, left, label] {stopped};
+  
+  % Emergency: from superstate to fault
+  \draw[arrow, ee-red, very thick] (op.east) -- (fault.west) node[midway, above, label, text=ee-red] {fault\_detected /\\disable motor};
+  
+  % Recovery
+  \draw[arrow, ee-green!70!black, bend left=30] (fault.south) to node[midway, below, label] {reset /\\self-test()} (op.south east);
+  
+  % Entry/exit labels
+  \node[font=\tiny\itshape, text=ee-gray, anchor=south west] at (idle.north west) {entry/enable\_watchdog()};
+  \node[font=\tiny\itshape, text=ee-gray, anchor=north west] at (fault.south west) {entry/log\_fault()};
+  
+  % History pseudo-state
+  \node[draw, circle, thick, minimum size=0.45cm, font=\tiny\bfseries] (H) at (8.2,-4.2) {H};
+  \draw[arrow, dashed, ee-gray] (op.south east) ++(0.3,-0.1) -- (H);
+  
+\end{tikzpicture}
+\caption{HSM: Motor controller with ``Operational'' superstate and ``Fault'' handling. The fault transition applies to all substates simultaneously.}
+\label{fig:mod:hsm}
+\end{figure}
+
+\begin{insight}
+Without hierarchy, the fault transition would need to be duplicated for every substate (Idle, Accelerating, Cruising, Decelerating). The superstate defines it once.
+\end{insight}
+
+\subsection{HSM Implementation Approach}
+
+HSMs can be implemented using frameworks like QP (Quantum Platform) by Miro Samek, which provides:
+\begin{itemize}[nosep]
+  \item State handler functions (one per state, processes events and returns transition targets)
+  \item Automatic entry/exit action execution during transitions
+  \item History tracking
+\end{itemize}
+
+Simplified C pattern for nested states:
+
+\begin{lstlisting}[style=C, caption={Simplified hierarchical state handler pattern.}]
+typedef enum { SIG_START, SIG_STOP, SIG_FAULT, SIG_RESET } signal_t;
+
+typedef struct {
+    void (*state)(signal_t sig);  // Current state handler
+} hsm_t;
+
+static hsm_t motor_hsm;
+
+/* Superstate handler */
+void operational(signal_t sig) {
+    switch (sig) {
+        case SIG_FAULT:
+            log_fault();
+            disable_motor();
+            motor_hsm.state = fault_state;  // Transition to Fault
+            break;
+        default:
+            break;  // Unhandled events stay in current substate
+    }
+}
+
+/* Substate: Idle */
+void idle_state(signal_t sig) {
+    switch (sig) {
+        case SIG_START:
+            enable_watchdog();
+            set_motor_target(target_speed);
+            motor_hsm.state = accel_state;
+            break;
+        default:
+            operational(sig);  // Delegate to superstate
+            break;
+    }
+}
+
+/* Substate: Accelerating */
+void accel_state(signal_t sig) {
+    switch (sig) {
+        case SIG_STOP:
+            motor_hsm.state = decel_state;
+            break;
+        default:
+            operational(sig);  // Delegate to superstate
+            break;
+    }
+}
+
+/* Fault state (not a substate of Operational) */
+void fault_state(signal_t sig) {
+    switch (sig) {
+        case SIG_RESET:
+            if (self_test_pass()) {
+                motor_hsm.state = idle_state;  // Or restore history
+            }
+            break;
+        default:
+            break;
+    }
+}
+\end{lstlisting}
+
+The key pattern is \textbf{delegation}: unhandled events in a substate are forwarded to the superstate handler.
+
+% ----------------------------------------------------------------------------
+\section{State Flow Models}
+\label{sec:mod:stateflow}
+
+\subsection{Stateflow in Simulink}
+
+MATLAB/Simulink's Stateflow tool allows graphical design of state machines with:
+\begin{itemize}[nosep]
+  \item Chart-level and state-level data
+  \item Condition actions (evaluated during transitions)
+  \item Temporal logic operators (\texttt{after(5, sec)}, \texttt{count(event)})
+  \item Code generation (C/C++) from the model
+\end{itemize}
+
+This model-driven approach is widely used in automotive (ISO 26262) and aerospace (DO-178C) for safety-critical development.
+
+\subsection{Model-Driven Development Workflow}
+
+\begin{enumerate}
+  \item \textbf{Model:} Design the system using UML/statecharts in a modelling tool.
+  \item \textbf{Simulate:} Run the model to validate behaviour before writing any code.
+  \item \textbf{Generate:} Automatically generate C/C++ code from the validated model.
+  \item \textbf{Verify:} Test the generated code against the model (back-to-back testing).
+  \item \textbf{Deploy:} Compile and flash the generated code to the target MCU.
+\end{enumerate}
+
+\begin{practicalNote}
+In industry, tools like IBM Rhapsody, MATLAB Simulink/Stateflow, and Yakindu Statechart Tools are used for model-driven development. The generated code is traceable to requirements, which is essential for certification in safety-critical domains.
+\end{practicalNote}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:mod:examples}
+
+\begin{example}[Vending Machine FSM]
+Design an FSM for a simple vending machine that accepts 5-cent and 10-cent coins for a 15-cent item. Draw the state diagram and implement it using a switch-case in C.
+
+\begin{solution}
+\textbf{States:} \{IDLE (0 cents), FIVE (5 cents), TEN (10 cents)\}\\
+\textbf{Events:} \{COIN\_5, COIN\_10\}\\
+\textbf{Actions:} dispense(), return\_change()
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, thick, circle, minimum size=1.8cm, font=\small\bfseries},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\scriptsize, align=center}
+  ]
+  
+  \node[state, fill=ee-blue!15] (s0) at (0,0) {IDLE\\{\tiny 0\textcent}};
+  \node[state, fill=ee-amber!15] (s5) at (4,0) {FIVE\\{\tiny 5\textcent}};
+  \node[state, fill=ee-amber!20] (s10) at (8,0) {TEN\\{\tiny 10\textcent}};
+  
+  \fill[black] (-2,0) circle (3pt);
+  \draw[arrow] (-2,0) -- (s0);
+  
+  \draw[arrow, bend left=20] (s0) to node[midway, above, label] {5\textcent} (s5);
+  \draw[arrow, bend left=20] (s0) to[out=30, in=150] node[midway, above, label] {10\textcent} (s10);
+  \draw[arrow, bend left=20] (s5) to node[midway, above, label] {5\textcent} (s10);
+  
+  % Dispense transitions (back to IDLE)
+  \draw[arrow, ee-green!70!black, bend left=25] (s5) to node[midway, below, label, text=ee-green!70!black] {10\textcent\\dispense()} (s0);
+  \draw[arrow, ee-green!70!black, bend left=40] (s10) to[out=-150, in=-30] node[midway, below, label, text=ee-green!70!black] {5\textcent / dispense()} (s0);
+  \draw[arrow, ee-green!70!black, bend right=50] (s10) to[out=160, in=20] node[midway, above, label, text=ee-green!70!black] {10\textcent / dispense()\\return\_5\textcent()} (s0);
+  
+\end{tikzpicture}
+\caption{Vending machine FSM.}
+\end{figure}
+
+\begin{lstlisting}[style=C, caption={Vending machine FSM in C.}]
+typedef enum { ST_IDLE, ST_FIVE, ST_TEN } vm_state_t;
+typedef enum { EV_COIN5, EV_COIN10 } vm_event_t;
+
+static vm_state_t state = ST_IDLE;
+
+void vending_fsm(vm_event_t event) {
+    switch (state) {
+        case ST_IDLE:
+            if (event == EV_COIN5)       state = ST_FIVE;
+            else if (event == EV_COIN10) state = ST_TEN;
+            break;
+        case ST_FIVE:
+            if (event == EV_COIN5)       state = ST_TEN;
+            else if (event == EV_COIN10) {
+                dispense();              // 5+10 = 15
+                state = ST_IDLE;
+            }
+            break;
+        case ST_TEN:
+            if (event == EV_COIN5) {
+                dispense();              // 10+5 = 15
+                state = ST_IDLE;
+            } else if (event == EV_COIN10) {
+                dispense();              // 10+10 = 20 > 15
+                return_change(5);        // Return 5 cents
+                state = ST_IDLE;
+            }
+            break;
+    }
+}
+\end{lstlisting}
+\end{solution}
+\end{example}
+
+\begin{example}[UML State Machine for a Microwave Oven]
+Design a UML state machine diagram for a microwave oven with the following requirements: (a) The door can be opened or closed. (b) Cooking only starts when the door is closed and the start button is pressed. (c) Opening the door during cooking immediately stops the magnetron. (d) A timer counts down during cooking.
+
+\begin{solution}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, thick, rounded corners=4pt, minimum width=2.2cm, minimum height=0.9cm, font=\small\bfseries, align=center},
+    superstate/.style={draw, thick, rounded corners=6pt, dashed, inner sep=10pt},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\scriptsize, align=center}
+  ]
+  
+  \node[state, fill=ee-red!15] (dopen) at (0,0) {Door\\Open};
+  \node[state, fill=ee-blue!15] (idle) at (5,0) {Idle\\(Door Closed)};
+  \node[state, fill=ee-green!20] (cooking) at (10,0) {Cooking};
+  \node[state, fill=ee-amber!15] (done) at (10,-3) {Done\\(Beeping)};
+  
+  \fill[black] (-2.5,0) circle (3pt);
+  \draw[arrow] (-2.5,0) -- (dopen);
+  
+  \draw[arrow, bend left=15] (dopen) to node[midway, above, label] {close\_door} (idle);
+  \draw[arrow, bend left=15] (idle) to node[midway, below, label] {open\_door} (dopen);
+  
+  \draw[arrow] (idle) -- (cooking) node[midway, above, label] {start [timer > 0]\\/ magnetron\_on()};
+  
+  \draw[arrow] (cooking) -- (done) node[midway, right, label] {timer\_expired\\/ magnetron\_off()};
+  
+  \draw[arrow, ee-red] (cooking) to[out=160, in=40] node[midway, above, label, text=ee-red] {open\_door / magnetron\_off()} (dopen);
+  
+  \draw[arrow] (done) to[out=180, in=-55] node[midway, below, label] {open\_door\\/ stop\_beep()} (dopen);
+  
+\end{tikzpicture}
+\caption{Microwave oven UML state machine diagram.}
+\end{figure}
+
+The safety-critical property: $\square(\text{door\_open} \rightarrow \neg \text{magnetron\_on})$ --- the magnetron is \textbf{never} on when the door is open. This is enforced by the transition from Cooking to DoorOpen which calls \texttt{magnetron\_off()}.
+\end{solution}
+\end{example}
+
+\begin{example}[Table-Driven FSM for Serial Protocol]
+Design a function-pointer table FSM for parsing a simple serial frame: \texttt{[STX] [LEN] [DATA...] [CRC] [ETX]}. States: WAIT\_STX, READ\_LEN, READ\_DATA, READ\_CRC, VERIFY.
+
+\begin{solution}
+\begin{lstlisting}[style=C, caption={Table-driven FSM for serial frame parser.}]
+#define STX 0x02
+#define ETX 0x03
+
+typedef enum {
+    S_WAIT_STX, S_READ_LEN, S_READ_DATA, S_READ_CRC, S_COUNT
+} parser_state_t;
+
+typedef struct {
+    uint8_t buffer[256];
+    uint8_t length;
+    uint8_t index;
+    uint8_t crc;
+    parser_state_t state;
+} parser_t;
+
+typedef void (*state_handler_t)(parser_t *p, uint8_t byte);
+
+static void handle_wait_stx(parser_t *p, uint8_t byte) {
+    if (byte == STX) {
+        p->index = 0;
+        p->crc = 0;
+        p->state = S_READ_LEN;
+    }
+}
+
+static void handle_read_len(parser_t *p, uint8_t byte) {
+    p->length = byte;
+    p->crc ^= byte;
+    p->state = (byte > 0) ? S_READ_DATA : S_READ_CRC;
+}
+
+static void handle_read_data(parser_t *p, uint8_t byte) {
+    p->buffer[p->index++] = byte;
+    p->crc ^= byte;
+    if (p->index >= p->length) {
+        p->state = S_READ_CRC;
+    }
+}
+
+static void handle_read_crc(parser_t *p, uint8_t byte) {
+    if (byte == p->crc) {
+        process_frame(p->buffer, p->length);  // Valid frame
+    }
+    p->state = S_WAIT_STX;  // Reset for next frame
+}
+
+static const state_handler_t handlers[S_COUNT] = {
+    [S_WAIT_STX]  = handle_wait_stx,
+    [S_READ_LEN]  = handle_read_len,
+    [S_READ_DATA] = handle_read_data,
+    [S_READ_CRC]  = handle_read_crc,
+};
+
+void parser_feed(parser_t *p, uint8_t byte) {
+    handlers[p->state](p, byte);
+}
+\end{lstlisting}
+\end{solution}
+\end{example}
+
+\begin{example}[HSM Design for Washing Machine]
+Sketch a hierarchical state machine for a washing machine with a ``Running'' superstate containing substates (Fill, Wash, Drain, Spin). A ``Pause'' event from any running substate should pause and remember the current phase. A ``Door Open'' event from any state should go to an ``Error'' state.
+
+\begin{solution}
+\textbf{Design:}
+\begin{itemize}[nosep]
+  \item \textbf{Superstates:} Idle, Running (with substates Fill, Wash, Drain, Spin), Paused, Error.
+  \item \textbf{Running superstate transitions:} Pause $\to$ Paused (captures history); Door\_Open $\to$ Error (safety).
+  \item \textbf{History:} Paused stores the last active substate. Resume restores it.
+\end{itemize}
+
+The ``Running'' superstate handles the common Pause and Door\_Open events. Each substate only handles its phase-complete event:
+\begin{itemize}[nosep]
+  \item Fill: water\_level\_reached $\to$ Wash
+  \item Wash: wash\_timer\_done $\to$ Drain
+  \item Drain: drain\_complete $\to$ Spin
+  \item Spin: spin\_timer\_done $\to$ Idle
+\end{itemize}
+
+The HSM eliminates 8 redundant transitions (2 events $\times$ 4 substates) that a flat FSM would require.
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:mod:practice}
+
+\begin{exercise}[Elevator FSM]
+Design a flat FSM for a 3-floor elevator. Include states for each floor, moving up, and moving down. Show transitions for floor requests and arrival sensors. Implement the FSM using a function pointer table in C.
+\end{exercise}
+
+\begin{exercise}[UML Sequence Diagram]
+Draw a UML sequence diagram for an I2C transaction: Master sends a Start condition, slave address + write bit, waits for ACK, sends 2 data bytes (each with ACK), and then sends Stop. Show the timing on the lifelines.
+\end{exercise}
+
+\begin{exercise}[Mealy vs.\ Moore]
+Convert the traffic light FSM (Figure~\ref{fig:mod:trafficfsm}) from a Moore machine to a Mealy machine. What changes in the state diagram? Which representation would you prefer for implementation and why?
+\end{exercise}
+
+\begin{exercise}[HSM Design]
+Design an HSM for a smart thermostat with: (a) an ``Off'' state, (b) a ``Heating'' superstate with substates (Pre-heat, Maintain), (c) a ``Cooling'' superstate with substates (Pre-cool, Maintain), (d) a ``Fault'' state accessible from any superstate. Implement the superstate delegation pattern in C.
+\end{exercise}
+
+\begin{exercise}[Code Generation]
+Given the vending machine FSM from the worked example, write a Python script that reads a CSV description of the FSM (state, event, next\_state, action) and generates the C switch-case implementation automatically.
+\end{exercise}
+
+\begin{exercise}[Stateflow to C]
+A Simulink Stateflow chart has two parallel (orthogonal) regions: a ``Motor Control'' region and a ``Sensor Monitor'' region. Explain how you would implement orthogonal regions in C without a tool like Stateflow. What are the synchronisation challenges?
+\end{exercise}

@@ -1,0 +1,780 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 2: Microprocessor/Microcontroller Architecture
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Microprocessor/Microcontroller Architecture}
+\label{ch:architecture}
+\chaptermark{Module 2}
+
+\begin{moduleinfo}
+  \textbf{Module:} 2 \quad
+  \textbf{Lecture Hours:} 5 \quad
+  \textbf{ILOs Addressed:} ILO-1, ILO-2, ILO-3 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Describe and compare Von Neumann and Harvard architectures.
+    \item Explain the 5-stage instruction pipeline and identify pipeline hazards.
+    \item Compare CISC and RISC instruction set philosophies.
+    \item Describe the internal architecture of a typical microcontroller including peripherals and interrupt handling.
+    \item Write and interpret basic ARM assembly instructions.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{A Representative Microprocessor Architecture}
+\label{sec:arch:rep}
+
+A microprocessor is a digital integrated circuit that executes a stored program. Its core building blocks are the Arithmetic Logic Unit (ALU), the register file, the control unit, and the system buses.
+
+\subsection{Von Neumann vs.\ Harvard Architecture}
+
+\begin{definition}[Von Neumann Architecture]
+A computer architecture in which instructions and data share a single memory space and a single bus system. The processor fetches instructions and reads/writes data over the same bus, creating a potential bottleneck known as the \emph{Von Neumann bottleneck}.
+\end{definition}
+
+\begin{definition}[Harvard Architecture]
+A computer architecture with physically separate memory spaces and buses for instructions and data. This allows simultaneous instruction fetch and data access, increasing throughput.
+\end{definition}
+
+% TikZ: Von Neumann Architecture
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=3cm, minimum height=1.2cm, align=center, fill=ee-blue!8},
+    bus/.style={draw, thick, fill=ee-amber!15, minimum width=8cm, minimum height=0.5cm},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    biarrow/.style={{Stealth[length=3mm]}-{Stealth[length=3mm]}, thick}
+  ]
+  
+  % CPU block
+  \node[block, minimum width=4cm, minimum height=2.5cm] (cpu) at (0,2.5) {};
+  \node[above] at (cpu.north) {\textbf{CPU}};
+  \node[block, minimum width=1.5cm, minimum height=0.8cm, fill=ee-green!10] (alu) at (-0.8,2.8) {ALU};
+  \node[block, minimum width=1.5cm, minimum height=0.8cm, fill=ee-green!10] (cu) at (0.8,2.8) {Control\\Unit};
+  \node[block, minimum width=3.5cm, minimum height=0.6cm, fill=ee-amber!10] (regs) at (0,1.8) {Register File};
+  
+  % System bus
+  \node[bus] (sysbus) at (0,0) {\textbf{System Bus} (Address + Data + Control)};
+  
+  % Memory and I/O
+  \node[block, fill=ee-blue!10] (mem) at (-3,-1.8) {Unified\\Memory\\(Code + Data)};
+  \node[block, fill=ee-amber!10] (io) at (3,-1.8) {I/O\\Devices};
+  
+  % Connections
+  \draw[biarrow] (cpu.south) -- (sysbus.north);
+  \draw[biarrow] (sysbus.south) ++(-3,0) -- (mem.north);
+  \draw[biarrow] (sysbus.south) ++(3,0) -- (io.north);
+  
+\end{tikzpicture}
+\caption{Von Neumann architecture: single shared bus for instructions and data.}
+\label{fig:arch:vonneumann}
+\end{figure}
+
+% TikZ: Harvard Architecture
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=3cm, minimum height=1.2cm, align=center, fill=ee-blue!8},
+    arrow/.style={-{Stealth[length=3mm]}, thick},
+    biarrow/.style={{Stealth[length=3mm]}-{Stealth[length=3mm]}, thick}
+  ]
+  
+  % CPU
+  \node[block, minimum width=4cm, minimum height=2.5cm] (cpu) at (0,0) {};
+  \node[above] at (cpu.north) {\textbf{CPU}};
+  \node[block, minimum width=1.5cm, minimum height=0.8cm, fill=ee-green!10] (alu) at (-0.8,0.3) {ALU};
+  \node[block, minimum width=1.5cm, minimum height=0.8cm, fill=ee-green!10] (cu) at (0.8,0.3) {Control\\Unit};
+  \node[block, minimum width=3.5cm, minimum height=0.6cm, fill=ee-amber!10] (regs) at (0,-0.7) {Register File};
+  
+  % Instruction memory
+  \node[block, fill=ee-green!10] (imem) at (-4,-3) {Instruction\\Memory};
+  
+  % Data memory
+  \node[block, fill=ee-amber!10] (dmem) at (4,-3) {Data\\Memory};
+  
+  % I/O
+  \node[block, fill=ee-red!10] (io) at (0,-4.5) {I/O Devices};
+  
+  % Instruction bus
+  \draw[arrow, ee-green!70!black] (imem.north) -- ++(0,0.8) -| (cpu.south west) node[pos=0.25, above, font=\footnotesize] {Instruction Bus};
+  
+  % Data bus
+  \draw[biarrow, ee-amber!70!black] (dmem.north) -- ++(0,0.8) -| (cpu.south east) node[pos=0.25, above, font=\footnotesize] {Data Bus};
+  
+  % I/O bus
+  \draw[biarrow, ee-red!70!black] (cpu.south) -- (io.north) node[midway, right, font=\footnotesize] {I/O};
+  
+\end{tikzpicture}
+\caption{Harvard architecture: separate instruction and data buses enabling simultaneous access.}
+\label{fig:arch:harvard}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Von Neumann vs.\ Harvard architecture comparison.}
+\label{tab:arch:vnvsh}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Attribute} & \textbf{Von Neumann} & \textbf{Harvard} \\
+\midrule
+Bus structure & Single shared bus & Separate instruction \& data buses \\
+Bandwidth & Limited (sequential fetch/data) & Higher (parallel access) \\
+Complexity & Simpler wiring & More buses, more complex \\
+Self-modifying code & Possible & Not straightforward \\
+Typical use & Desktop CPUs, x86 & DSPs, microcontrollers, ARM Cortex-M \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{insight}
+Most modern processors use a \emph{modified Harvard architecture}: separate L1 instruction and data caches (Harvard) backed by a unified main memory (Von Neumann). ARM Cortex-M processors are a classic example --- they use separate instruction and data buses (AHB-Lite) internally but present a unified memory map to the programmer.
+\end{insight}
+
+\subsection{Core Components}
+
+\begin{itemize}
+  \item \textbf{Arithmetic Logic Unit (ALU):} Performs integer arithmetic (add, subtract, multiply) and bitwise logic (AND, OR, XOR, shift). The ALU receives operands from the register file and writes results back.
+  \item \textbf{Register File:} A small, fast memory array (typically 16--32 registers, each 32 or 64 bits). Operands for ALU operations are loaded from registers; results are stored back. Special registers include the Program Counter (PC), Stack Pointer (SP), and Link Register (LR).
+  \item \textbf{Control Unit (CU):} Decodes the current instruction and generates control signals that coordinate the ALU, register file, memory interface, and buses. In a hardwired CU, logic gates directly implement the control function. In a microprogrammed CU, a microinstruction ROM stores control sequences.
+\end{itemize}
+
+\subsection{System Buses}
+
+Three buses interconnect the processor, memory, and peripherals:
+\begin{enumerate}
+  \item \textbf{Address Bus:} Unidirectional; carries the memory address. Width determines addressable space: $2^n$ locations for an $n$-bit address bus.
+  \item \textbf{Data Bus:} Bidirectional; carries instruction opcodes and operand data. Width (8, 16, 32, 64 bits) determines how much data transfers per cycle.
+  \item \textbf{Control Bus:} Carries timing and control signals: read/write, interrupt request, bus grant, clock.
+\end{enumerate}
+
+% ----------------------------------------------------------------------------
+\section{Instruction Set Architectures (ISA)}
+\label{sec:arch:isa}
+
+The ISA defines the programmer-visible interface to the processor: the instruction encoding, register model, addressing modes, and data types.
+
+\subsection{CISC vs.\ RISC Philosophy}
+
+\begin{table}[H]
+\centering
+\caption{CISC vs.\ RISC design philosophies.}
+\label{tab:arch:ciscrisc}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Attribute} & \textbf{CISC} & \textbf{RISC} \\
+\midrule
+Instruction count & Many (hundreds) & Few (dozens of base instructions) \\
+Instruction complexity & Complex, multi-step & Simple, single-cycle ALU operations \\
+Instruction length & Variable (1--15 bytes for x86) & Fixed (4 bytes for ARM, 2 bytes for Thumb) \\
+Addressing modes & Many (memory-to-memory) & Few (load/store architecture) \\
+Register count & Few (8 GPRs for x86) & Many (16--32 GPRs) \\
+Pipeline friendliness & Hard to pipeline (variable decode) & Easy (uniform decode stage) \\
+Code density & Higher (fewer instructions needed) & Lower (more instructions, but simpler) \\
+Examples & x86, 68000, VAX & ARM, MIPS, RISC-V, PowerPC \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{important}[Load/Store Architecture]
+RISC processors follow the \emph{load/store} paradigm: \textbf{only} \instr{LDR} and \instr{STR} instructions access memory. All arithmetic and logic instructions operate exclusively on registers. This simplifies the pipeline because memory access is confined to a single, predictable pipeline stage.
+\end{important}
+
+\subsection{Instruction Formats}
+
+Using a MIPS-like encoding as an instructional example (similar principles apply to ARM):
+
+\begin{itemize}
+  \item \textbf{R-type (Register):} Three register operands. Format: \texttt{opcode | rs | rt | rd | shamt | funct}. Example: \instr{ADD R3, R1, R2}.
+  \item \textbf{I-type (Immediate):} One source register + immediate constant. Format: \texttt{opcode | rs | rt | immediate}. Example: \instr{ADDI R3, R1, \#5}.
+  \item \textbf{J-type (Jump):} Target address for unconditional jumps. Format: \texttt{opcode | address}. Example: \instr{J label}.
+\end{itemize}
+
+\subsection{Addressing Modes}
+
+\begin{table}[H]
+\centering
+\caption{Common addressing modes in embedded processors.}
+\label{tab:arch:addrmodes}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Mode} & \textbf{Syntax Example} & \textbf{Effective Address} \\
+\midrule
+Immediate & \texttt{MOV R0, \#42} & Operand is in the instruction itself \\
+Register & \texttt{MOV R0, R1} & Operand is in register R1 \\
+Direct & \texttt{LDR R0, [0x2000]} & EA = address literal in instruction \\
+Register indirect & \texttt{LDR R0, [R1]} & EA = contents of R1 \\
+Indexed (base+offset) & \texttt{LDR R0, [R1, \#8]} & EA = R1 + 8 \\
+Pre-indexed with writeback & \texttt{LDR R0, [R1, \#4]!} & EA = R1 + 4; R1 $\leftarrow$ R1 + 4 \\
+Post-indexed & \texttt{LDR R0, [R1], \#4} & EA = R1; then R1 $\leftarrow$ R1 + 4 \\
+PC-relative & \texttt{LDR R0, [PC, \#offset]} & EA = PC + offset (for constants) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{ARM ISA Overview}
+
+The ARM architecture is the dominant ISA in embedded systems:
+\begin{itemize}
+  \item \textbf{ARM state:} 32-bit fixed-length instructions, full instruction set.
+  \item \textbf{Thumb state:} 16-bit compressed instructions for improved code density (at slight performance cost).
+  \item \textbf{Thumb-2:} Mixed 16/32-bit instruction encoding used by all Cortex-M processors. Achieves near-ARM performance with Thumb-like code density.
+  \item \textbf{Condition codes:} ARM instructions can be conditionally executed based on the APSR flags (N, Z, C, V), reducing branch overhead. Example: \instr{ADDEQ R0, R1, R2} executes only if the Zero flag is set.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Instruction Fetch and Execution Cycles}
+\label{sec:arch:pipeline}
+
+\subsection{Single-Cycle and Multi-Cycle Execution}
+
+In the simplest implementation, each instruction takes one clock cycle but the cycle must be long enough for the slowest instruction. Multi-cycle implementations break execution into stages, each taking one shorter clock cycle:
+
+\begin{enumerate}
+  \item \textbf{Instruction Fetch (IF):} Read instruction from memory at address PC; increment PC.
+  \item \textbf{Instruction Decode (ID):} Decode opcode, read source registers from register file.
+  \item \textbf{Execute (EX):} ALU computes result (arithmetic) or effective address (load/store).
+  \item \textbf{Memory Access (MEM):} Read from or write to data memory (only for load/store instructions).
+  \item \textbf{Write Back (WB):} Write the result to the destination register.
+\end{enumerate}
+
+\subsection{Pipelining}
+
+Pipelining overlaps the execution of multiple instructions. While instruction $i$ is in the EX stage, instruction $i+1$ is in ID, and instruction $i+2$ is in IF. Ideally, one instruction completes per cycle (CPI $\approx$ 1) after the pipeline fills.
+
+% TikZ: 5-stage pipeline
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    stage/.style={draw, thick, minimum width=1.8cm, minimum height=0.7cm, align=center, font=\small\ttfamily},
+    arrow/.style={-{Stealth[length=2mm]}, thick}
+  ]
+  
+  % Pipeline stages header
+  \foreach \i/\name/\col in {0/IF/ee-green!20, 1/ID/ee-blue!20, 2/EX/ee-amber!20, 3/MEM/ee-red!20, 4/WB/ee-green!15} {
+    \node[stage, fill=\col] (h\i) at (\i*2.2, 0) {\name};
+  }
+  
+  % Arrows between stages
+  \foreach \i [evaluate=\i as \j using int(\i+1)] in {0,...,3} {
+    \draw[arrow] (h\i.east) -- (h\j.west);
+  }
+  
+  % Pipeline timing diagram below
+  \node[font=\small\bfseries, anchor=east] at (-1.5, -1.2) {Cycle:};
+  \foreach \c in {1,...,9} {
+    \node[font=\small] at (\c*1.2 - 0.4, -1.2) {\c};
+  }
+  
+  % Instructions
+  \foreach \instr/\row/\color in {I1/-2/ee-green, I2/-2.7/ee-blue, I3/-3.4/ee-amber, I4/-4.1/ee-red} {
+    \node[font=\small\ttfamily, anchor=east] at (-1.5, \row) {\instr};
+  }
+  
+  % I1 pipeline
+  \foreach \stage/\col/\pos in {IF/ee-green!30/0, ID/ee-blue!30/1, EX/ee-amber!30/2, MEM/ee-red!30/3, WB/ee-green!25/4} {
+    \pgfmathsetmacro{\xpos}{\pos*1.2 - 0.4 + 0.8}
+    \node[draw, fill=\col, minimum width=1cm, minimum height=0.55cm, font=\tiny\ttfamily] at (\xpos, -2) {\stage};
+  }
+  
+  % I2 pipeline (shifted by 1)
+  \foreach \stage/\col/\pos in {IF/ee-green!30/1, ID/ee-blue!30/2, EX/ee-amber!30/3, MEM/ee-red!30/4, WB/ee-green!25/5} {
+    \pgfmathsetmacro{\xpos}{\pos*1.2 - 0.4 + 0.8}
+    \node[draw, fill=\col, minimum width=1cm, minimum height=0.55cm, font=\tiny\ttfamily] at (\xpos, -2.7) {\stage};
+  }
+  
+  % I3 pipeline (shifted by 2)
+  \foreach \stage/\col/\pos in {IF/ee-green!30/2, ID/ee-blue!30/3, EX/ee-amber!30/4, MEM/ee-red!30/5, WB/ee-green!25/6} {
+    \pgfmathsetmacro{\xpos}{\pos*1.2 - 0.4 + 0.8}
+    \node[draw, fill=\col, minimum width=1cm, minimum height=0.55cm, font=\tiny\ttfamily] at (\xpos, -3.4) {\stage};
+  }
+  
+  % I4 pipeline (shifted by 3)
+  \foreach \stage/\col/\pos in {IF/ee-green!30/3, ID/ee-blue!30/4, EX/ee-amber!30/5, MEM/ee-red!30/6, WB/ee-green!25/7} {
+    \pgfmathsetmacro{\xpos}{\pos*1.2 - 0.4 + 0.8}
+    \node[draw, fill=\col, minimum width=1cm, minimum height=0.55cm, font=\tiny\ttfamily] at (\xpos, -4.1) {\stage};
+  }
+  
+\end{tikzpicture}
+\caption{5-stage instruction pipeline showing overlapped execution of four instructions.}
+\label{fig:arch:pipeline}
+\end{figure}
+
+\subsection{Pipeline Hazards}
+
+Pipelining introduces three types of hazards:
+
+\begin{definition}[Data Hazard]
+Occurs when an instruction depends on the result of a preceding instruction that has not yet completed its write-back stage. Example: \instr{ADD R1, R2, R3} followed by \instr{SUB R4, R1, R5} --- the SUB reads R1 before ADD writes it.
+\end{definition}
+
+\textbf{Resolution techniques:}
+\begin{itemize}
+  \item \textbf{Stalling (bubbling):} Insert NOP cycles until the data is available. Simple but wastes cycles.
+  \item \textbf{Forwarding (bypassing):} Route the ALU result directly from EX/MEM stage to the next instruction's EX input, bypassing the register file write. Eliminates most stalls.
+\end{itemize}
+
+\begin{definition}[Control Hazard]
+Occurs at branch instructions: the pipeline has already fetched subsequent instructions before knowing whether the branch is taken. A taken branch means the fetched instructions are wrong.
+\end{definition}
+
+\textbf{Resolution:}
+\begin{itemize}
+  \item \textbf{Branch prediction:} Predict taken or not-taken; flush pipeline on misprediction.
+  \item \textbf{Delayed branch:} Fill the branch delay slot with a useful instruction (common in MIPS).
+  \item \textbf{Branch target buffer (BTB):} Cache recent branch targets for quick redirection.
+\end{itemize}
+
+\begin{definition}[Structural Hazard]
+Occurs when two pipeline stages need the same hardware resource simultaneously (e.g., a single-port memory for both IF and MEM stages).
+\end{definition}
+
+\textbf{Resolution:} Duplicate resources (separate instruction and data caches — Harvard approach).
+
+\subsection{Branch Prediction}
+
+Modern processors use branch predictors to guess the outcome of conditional branches:
+\begin{itemize}
+  \item \textbf{Static prediction:} Always predict not-taken (or always taken for backward branches in loops).
+  \item \textbf{Dynamic prediction:} Use a 2-bit saturating counter per branch address. States: Strongly Not Taken $\to$ Weakly Not Taken $\to$ Weakly Taken $\to$ Strongly Taken. Achieves 85--95\% accuracy.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    state/.style={draw, circle, thick, minimum size=1.2cm, font=\small, align=center},
+    arrow/.style={-{Stealth[length=2.5mm]}, thick}
+  ]
+  
+  \node[state, fill=ee-red!15] (SNT) at (0,0) {SNT\\00};
+  \node[state, fill=ee-amber!15] (WNT) at (3,0) {WNT\\01};
+  \node[state, fill=ee-amber!15] (WT) at (6,0) {WT\\10};
+  \node[state, fill=ee-green!15] (ST) at (9,0) {ST\\11};
+  
+  \draw[arrow, ee-green!70!black] (SNT) to[bend left=25] node[above, font=\scriptsize] {Taken} (WNT);
+  \draw[arrow, ee-red!70!black] (WNT) to[bend left=25] node[below, font=\scriptsize] {Not Taken} (SNT);
+  \draw[arrow, ee-green!70!black] (WNT) to[bend left=25] node[above, font=\scriptsize] {Taken} (WT);
+  \draw[arrow, ee-red!70!black] (WT) to[bend left=25] node[below, font=\scriptsize] {Not Taken} (WNT);
+  \draw[arrow, ee-green!70!black] (WT) to[bend left=25] node[above, font=\scriptsize] {Taken} (ST);
+  \draw[arrow, ee-red!70!black] (ST) to[bend left=25] node[below, font=\scriptsize] {Not Taken} (WT);
+  
+  % Self-loops
+  \draw[arrow, ee-red!70!black] (SNT) to[loop left] node[left, font=\scriptsize] {NT} ();
+  \draw[arrow, ee-green!70!black] (ST) to[loop right] node[right, font=\scriptsize] {T} ();
+  
+  % Prediction labels
+  \node[below=0.5cm of SNT, font=\scriptsize\itshape, text=ee-red] {Predict:\\Not Taken};
+  \node[below=0.5cm of WNT, font=\scriptsize\itshape, text=ee-red] {Predict:\\Not Taken};
+  \node[below=0.5cm of WT, font=\scriptsize\itshape, text=ee-green!70!black] {Predict:\\Taken};
+  \node[below=0.5cm of ST, font=\scriptsize\itshape, text=ee-green!70!black] {Predict:\\Taken};
+  
+\end{tikzpicture}
+\caption{2-bit saturating counter branch predictor state machine.}
+\label{fig:arch:branchpred}
+\end{figure}
+
+% ARM Cortex-M pipeline
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    stage/.style={draw, thick, minimum width=2.5cm, minimum height=1cm, align=center, font=\small},
+    arrow/.style={-{Stealth[length=3mm]}, thick}
+  ]
+  
+  \node[stage, fill=ee-green!15] (fetch) at (0,0) {\textbf{Fetch}\\Instruction from\\Flash/I-Cache};
+  \node[stage, fill=ee-blue!15] (decode) at (4,0) {\textbf{Decode}\\Thumb-2\\Decoder};
+  \node[stage, fill=ee-amber!15] (exec) at (8,0) {\textbf{Execute}\\ALU, Multiply,\\Load/Store};
+  
+  \draw[arrow] (fetch) -- (decode) node[midway, above, font=\scriptsize] {32-bit instruction};
+  \draw[arrow] (decode) -- (exec) node[midway, above, font=\scriptsize] {Control signals};
+  
+  % Pipeline register labels
+  \node[below=0.3cm of fetch, font=\scriptsize\itshape, text=ee-gray] {PC updated};
+  \node[below=0.3cm of decode, font=\scriptsize\itshape, text=ee-gray] {Reg read};
+  \node[below=0.3cm of exec, font=\scriptsize\itshape, text=ee-gray] {Result + Reg write};
+  
+  \node[above=0.8cm of decode, font=\small\bfseries] {ARM Cortex-M3/M4: 3-Stage Pipeline};
+  
+\end{tikzpicture}
+\caption{ARM Cortex-M3/M4 3-stage pipeline architecture.}
+\label{fig:arch:cortexmpipeline}
+\end{figure}
+
+\begin{practicalNote}
+The ARM Cortex-M3/M4 uses a simplified \textbf{3-stage pipeline} (Fetch, Decode, Execute), not the classic 5-stage design. The Cortex-M7 extends this to a \textbf{6-stage pipeline} with branch prediction and dual-issue capability. The 3-stage design keeps interrupt latency low (12 cycles on Cortex-M3) at the cost of some throughput.
+\end{practicalNote}
+
+% ----------------------------------------------------------------------------
+\section{Microcontroller Internals}
+\label{sec:arch:mcu}
+
+A microcontroller integrates the processor core with on-chip peripherals, eliminating the need for external components in many applications.
+
+\subsection{On-Chip Peripherals}
+
+Typical MCU peripherals include:
+\begin{itemize}
+  \item \textbf{Timers:} General-purpose timers (counting, PWM generation, input capture), SysTick timer (ARM standard), real-time clock (RTC).
+  \item \textbf{UART:} Asynchronous serial communication (RS-232 compatible logic levels).
+  \item \textbf{SPI:} High-speed synchronous serial interface (full-duplex, up to 50\,Mbps).
+  \item \textbf{I\textsuperscript{2}C:} Two-wire synchronous serial bus (multi-master, 100/400/1000\,kbps).
+  \item \textbf{ADC:} Analog-to-digital converter (typically 12-bit SAR, multiple channels via multiplexer).
+  \item \textbf{DAC:} Digital-to-analog converter (12-bit, for waveform generation).
+  \item \textbf{GPIO:} General-purpose digital I/O pins, configurable as input or output with pull-up/pull-down.
+  \item \textbf{DMA:} Direct Memory Access controller for high-throughput data transfer without CPU intervention.
+  \item \textbf{Watchdog Timer (WDT):} Resets the processor if software fails to periodically refresh it, providing a recovery mechanism from software hangs.
+\end{itemize}
+
+\subsection{Memory Map of a Typical MCU}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    memblock/.style={draw, thick, minimum width=6cm, align=center, font=\small},
+    label/.style={font=\scriptsize\ttfamily, anchor=west}
+  ]
+  
+  % Memory blocks (bottom to top)
+  \node[memblock, minimum height=1.2cm, fill=ee-green!10] (flash) at (0,0) {\textbf{Flash Memory} (Code)\\512\,KB};
+  \node[memblock, minimum height=0.4cm, fill=ee-gray!10, above=0pt of flash] (rsvd1) {\scriptsize Reserved};
+  \node[memblock, minimum height=0.8cm, fill=ee-blue!10, above=0pt of rsvd1] (sram) {\textbf{SRAM} (Data)\\128\,KB};
+  \node[memblock, minimum height=0.4cm, fill=ee-gray!10, above=0pt of sram] (rsvd2) {\scriptsize Reserved};
+  \node[memblock, minimum height=1.5cm, fill=ee-amber!10, above=0pt of rsvd2] (periph) {\textbf{Peripheral Registers}\\APB1, APB2, AHB1, AHB2\\(GPIO, UART, SPI, TIM, ADC)};
+  \node[memblock, minimum height=0.4cm, fill=ee-gray!10, above=0pt of periph] (rsvd3) {\scriptsize Reserved};
+  \node[memblock, minimum height=0.6cm, fill=ee-red!10, above=0pt of rsvd3] (sys) {\textbf{System} (NVIC, SCB, SysTick)};
+  
+  % Address labels
+  \node[label] at (3.2,0) {\hex{0000\_0000}};
+  \node[label] at (3.2,0) {\hex{0000\_0000}};
+  
+  % Left-side addresses
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {0 - 0.6}) {\hex{0000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {0 + 0.6}) {\hex{0007\_FFFF}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sram.south |- sram.south}) {\hex{2000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {periph.south |- periph.south}) {\hex{4000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sys.south |- sys.south}) {\hex{E000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sys.north |- sys.north}) {\hex{E00F\_FFFF}};
+  
+\end{tikzpicture}
+\caption{Simplified memory map of an STM32F4 microcontroller (Cortex-M4).}
+\label{fig:arch:memmap}
+\end{figure}
+
+\subsection{Interrupt Handling}
+
+\begin{definition}[Interrupt]
+An interrupt is a hardware or software signal that causes the processor to suspend its current execution, save context, and jump to an Interrupt Service Routine (ISR). Upon ISR completion, the processor restores context and resumes the interrupted program.
+\end{definition}
+
+Key concepts in ARM Cortex-M interrupt handling:
+
+\begin{itemize}
+  \item \textbf{Vector Table:} A table stored at the base of Flash memory (address \hex{0000\_0000}) containing the initial stack pointer value and addresses of all exception/interrupt handlers.
+  \item \textbf{NVIC (Nested Vectored Interrupt Controller):} Hardware unit that manages interrupt priorities, enables/disables individual interrupts, and supports nested interrupts (a higher-priority interrupt can preempt a lower-priority ISR).
+  \item \textbf{Exception Frame:} When an interrupt occurs, the hardware automatically pushes 8 registers onto the stack: R0--R3, R12, LR, PC, and xPSR. This takes 12 clock cycles on Cortex-M3.
+  \item \textbf{Tail-chaining:} If a pending interrupt is waiting when an ISR completes, the NVIC skips the full context restore/save and directly enters the next ISR, saving 6 cycles.
+\end{itemize}
+
+% Interrupt latency timing diagram
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.9]
+  % Time axis
+  \draw[-{Stealth}, thick] (0,0) -- (14,0) node[right] {Time (cycles)};
+  
+  % IRQ signal
+  \draw[thick] (0,3) -- (2,3) -- (2,3.6) -- (8,3.6) -- (8,3) -- (14,3);
+  \node[font=\small, anchor=east] at (0,3.3) {IRQ};
+  
+  % CPU activity
+  \draw[thick, fill=ee-blue!20] (0,1.5) rectangle (2,2.3);
+  \node[font=\scriptsize] at (1,1.9) {Main code};
+  
+  \draw[thick, fill=ee-amber!20] (2,1.5) rectangle (5,2.3);
+  \node[font=\scriptsize] at (3.5,1.9) {Context save};
+  
+  \draw[thick, fill=ee-green!20] (5,1.5) rectangle (10,2.3);
+  \node[font=\scriptsize] at (7.5,1.9) {ISR execution};
+  
+  \draw[thick, fill=ee-amber!20] (10,1.5) rectangle (12.5,2.3);
+  \node[font=\scriptsize] at (11.25,1.9) {Context restore};
+  
+  \draw[thick, fill=ee-blue!20] (12.5,1.5) rectangle (14,2.3);
+  \node[font=\scriptsize] at (13.25,1.9) {Main};
+  
+  % Latency annotation
+  \draw[{Stealth}-{Stealth}, ee-red, thick] (2,0.8) -- (5,0.8);
+  \node[font=\scriptsize, text=ee-red, below] at (3.5,0.7) {12 cycles (Cortex-M3)};
+  \node[font=\scriptsize, text=ee-red, below] at (3.5,0.3) {Interrupt latency};
+  
+  % Cycle markers
+  \foreach \x in {0,...,14} {
+    \draw (\x, -0.1) -- (\x, 0.1);
+  }
+  
+\end{tikzpicture}
+\caption{Interrupt latency: from IRQ assertion to first ISR instruction on ARM Cortex-M3.}
+\label{fig:arch:intlatency}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{ARM Assembly Code Examples}
+\label{sec:arch:asm}
+
+\subsection{Data Processing Instructions}
+
+\begin{lstlisting}[style=ARM, caption={ARM Cortex-M assembly: basic data processing.}]
+    ; R0 = a, R1 = b: compute R2 = 3*a + b - 1
+    MOV  R2, R0          ; R2 = a
+    ADD  R2, R2, R0, LSL #1  ; R2 = a + 2*a = 3*a
+    ADD  R2, R2, R1      ; R2 = 3*a + b
+    SUB  R2, R2, #1      ; R2 = 3*a + b - 1
+    
+    ; Bitwise operations
+    AND  R3, R0, #0xFF   ; R3 = a & 0xFF (mask lower byte)
+    ORR  R4, R0, R1      ; R4 = a | b
+    EOR  R5, R0, R1      ; R5 = a ^ b (XOR)
+\end{lstlisting}
+
+\subsection{Load/Store and Branch Instructions}
+
+\begin{lstlisting}[style=ARM, caption={ARM Cortex-M assembly: memory access and branching.}]
+    ; Load value from memory address stored in R0
+    LDR  R1, [R0]        ; R1 = *R0 (word load)
+    LDRB R2, [R0, #4]    ; R2 = *(uint8_t*)(R0 + 4)
+    
+    ; Store R3 to memory with post-increment
+    STR  R3, [R0], #4    ; *R0 = R3; R0 += 4
+    
+    ; Conditional branch: if R1 == 0, jump to label
+    CMP  R1, #0          ; Set flags: R1 - 0
+    BEQ  zero_handler    ; Branch if Zero flag set
+    
+    ; Loop example: sum array of N words
+    ; R0 = array base, R1 = N, R2 = sum (initially 0)
+    MOV  R2, #0
+loop:
+    LDR  R3, [R0], #4    ; Load next element, advance pointer
+    ADD  R2, R2, R3      ; Accumulate
+    SUBS R1, R1, #1      ; Decrement counter, set flags
+    BNE  loop            ; Branch if not zero
+\end{lstlisting}
+
+\subsection{C Code with Inline Assembly}
+
+\begin{lstlisting}[style=C, caption={C function using inline assembly to read the cycle counter (DWT) on Cortex-M.}]
+#include <stdint.h>
+
+static inline uint32_t get_cycle_count(void) {
+    uint32_t cycles;
+    __asm volatile ("MRS %0, DWT_CYCCNT" : "=r" (cycles));
+    return cycles;
+    /* Note: DWT->CYCCNT must be enabled first:
+       CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+       DWT->CYCCNT = 0;
+       DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk; */
+}
+
+// Alternative using CMSIS register access:
+uint32_t read_cycle_counter(void) {
+    return DWT->CYCCNT;
+}
+\end{lstlisting}
+
+% TikZ: 5-stage pipeline with forwarding paths
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    stage/.style={draw, thick, minimum width=2cm, minimum height=1.8cm, align=center, font=\small},
+    reg/.style={draw, thick, fill=ee-gray!15, minimum width=0.3cm, minimum height=1.8cm},
+    fwd/.style={-{Stealth[length=2mm]}, thick, ee-red, dashed},
+    conn/.style={-{Stealth[length=2mm]}, thick}
+  ]
+  
+  % Pipeline stages
+  \node[stage, fill=ee-green!10] (IF) at (0,0) {\textbf{IF}\\Instr.\\Fetch};
+  \node[reg] (r1) at (1.5,0) {};
+  \node[stage, fill=ee-blue!10] (ID) at (3,0) {\textbf{ID}\\Decode\\Reg Read};
+  \node[reg] (r2) at (4.5,0) {};
+  \node[stage, fill=ee-amber!10] (EX) at (6,0) {\textbf{EX}\\ALU\\Execute};
+  \node[reg] (r3) at (7.5,0) {};
+  \node[stage, fill=ee-red!10] (MEM) at (9,0) {\textbf{MEM}\\Data\\Memory};
+  \node[reg] (r4) at (10.5,0) {};
+  \node[stage, fill=ee-green!15] (WB) at (12,0) {\textbf{WB}\\Write\\Back};
+  
+  % Normal data path
+  \draw[conn] (IF) -- (r1);
+  \draw[conn] (r1) -- (ID);
+  \draw[conn] (ID) -- (r2);
+  \draw[conn] (r2) -- (EX);
+  \draw[conn] (EX) -- (r3);
+  \draw[conn] (r3) -- (MEM);
+  \draw[conn] (MEM) -- (r4);
+  \draw[conn] (r4) -- (WB);
+  
+  % Forwarding paths
+  \draw[fwd] (EX.south) -- ++(0,-1) -| (r2.south) node[pos=0.3, below, font=\scriptsize, text=ee-red] {EX $\to$ EX forwarding};
+  \draw[fwd] (MEM.south) -- ++(0,-1.5) -| ([xshift=0.1cm]r2.south) node[pos=0.25, below, font=\scriptsize, text=ee-red] {MEM $\to$ EX forwarding};
+  
+  % Label
+  \node[above=1cm of EX, font=\small\bfseries] {5-Stage Pipeline with Forwarding Paths};
+  
+\end{tikzpicture}
+\caption{5-stage pipeline datapath showing EX-to-EX and MEM-to-EX forwarding paths (dashed red arrows) that resolve data hazards without stalling.}
+\label{fig:arch:pipelinefwd}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:arch:examples}
+
+\begin{example}[Pipeline Timing Analysis]
+Consider the following instruction sequence on a 5-stage pipeline \emph{without} forwarding:
+\begin{lstlisting}[style=ARM, numbers=none]
+I1: ADD R1, R2, R3
+I2: SUB R4, R1, R5    ; depends on R1 from I1
+I3: AND R6, R1, R7    ; depends on R1 from I1
+I4: ORR R8, R4, R6    ; depends on R4 from I2, R6 from I3
+\end{lstlisting}
+Determine the number of stall cycles and total execution cycles.
+
+\begin{solution}
+Without forwarding, a dependent instruction must wait until the producing instruction reaches WB:
+
+\textbf{I2} depends on \reg{R1} from \textbf{I1}. I1 writes R1 in cycle 5 (WB). I2 needs R1 in cycle 3 (ID). $\Rightarrow$ 2-cycle stall.
+
+\textbf{I3} depends on \reg{R1} from \textbf{I1}. After the 2-stall, I3 enters ID in cycle 6. I1 wrote R1 in cycle 5. $\Rightarrow$ No additional stall (data available).
+
+\textbf{I4} depends on \reg{R4} from \textbf{I2} and \reg{R6} from \textbf{I3}. I2 writes R4 in cycle 9. I4 enters ID at the earliest in cycle 8 $\Rightarrow$ 1-cycle stall for R4. I3 writes R6 in cycle 10. $\Rightarrow$ This is the later dependency; 2-cycle stall for R6.
+
+Total stalls: $2 + 0 + 2 = 4$ stall cycles.
+
+Without stalls: 4 instructions on 5-stage pipeline = $5 + 3 = 8$ cycles.
+With stalls: $8 + 4 = 12$ cycles.
+Effective CPI: $12/4 = 3.0$.
+\end{solution}
+\end{example}
+
+\begin{example}[Pipeline with Forwarding]
+Repeat the previous example \emph{with} EX-to-EX and MEM-to-EX forwarding.
+
+\begin{solution}
+With forwarding:
+
+\textbf{I2} depends on \reg{R1} from \textbf{I1}: I1's ALU result is available at the end of EX stage (cycle 3). With EX-to-EX forwarding, I2 can read this value in its own EX stage (cycle 4). $\Rightarrow$ 0 stalls.
+
+\textbf{I3} depends on \reg{R1} from \textbf{I1}: By the time I3 reaches EX (cycle 5), I1's result has already been written back. $\Rightarrow$ 0 stalls.
+
+\textbf{I4} depends on \reg{R4} from \textbf{I2}: EX-to-EX forwarding provides R4. Also depends on \reg{R6} from \textbf{I3}: EX-to-EX forwarding provides R6. $\Rightarrow$ 0 stalls.
+
+Total stalls: 0. Total cycles: $5 + 3 = 8$. Effective CPI: $8/4 = 2.0$.
+
+% (The ideal CPI of 1.0 is only reached once the pipeline is full in steady state.)
+\end{solution}
+\end{example}
+
+\begin{example}[Address Calculation]
+Given \reg{R1} = \hex{2000\_0100}, what address does each instruction access?
+\begin{lstlisting}[style=ARM, numbers=none]
+(a) LDR R0, [R1]          
+(b) LDR R0, [R1, #8]      
+(c) LDR R0, [R1, #4]!     
+(d) LDR R0, [R1], #4      
+\end{lstlisting}
+
+\begin{solution}
+\begin{enumerate}[label=(\alph*)]
+  \item \textbf{Register indirect:} EA = R1 = \hex{2000\_0100}. R1 unchanged.
+  \item \textbf{Base + offset:} EA = R1 + 8 = \hex{2000\_0108}. R1 unchanged.
+  \item \textbf{Pre-indexed with writeback:} EA = R1 + 4 = \hex{2000\_0104}. After: R1 = \hex{2000\_0104}.
+  \item \textbf{Post-indexed:} EA = R1 = \hex{2000\_0100}. After: R1 = R1 + 4 = \hex{2000\_0104}.
+\end{enumerate}
+\end{solution}
+\end{example}
+
+\begin{example}[Interrupt Latency Calculation]
+An ARM Cortex-M4 running at \freq{168}{MHz} receives an IRQ. The NVIC pushes 8 registers (12 cycles), and the ISR executes 50 instructions averaging 1.2 CPI. Calculate the total interrupt response time.
+
+\begin{solution}
+Clock period: $T_{clk} = 1/168\text{MHz} \approx 5.95\,$ns.
+
+Context save: 12 cycles $\times 5.95\,$ns $= 71.4\,$ns.
+
+ISR execution: $50 \times 1.2 = 60$ cycles $\times 5.95\,$ns $= 357\,$ns.
+
+Context restore: 12 cycles $\times 5.95\,$ns $= 71.4\,$ns.
+
+\textbf{Total response time} (from IRQ to ISR start): $71.4\,$ns $\approx 71\,$ns.
+
+\textbf{Total interrupt handling time} (from IRQ to return to main): $71.4 + 357 + 71.4 \approx 500\,$ns.
+\end{solution}
+\end{example}
+
+\begin{example}[NVIC Priority Configuration]
+An STM32F4 uses 4 bits for interrupt priority (16 levels, 0 = highest). Configure priorities so that UART RX (IRQ 37) has higher priority than Timer 2 (IRQ 28), but both can preempt the SysTick handler.
+
+\begin{solution}
+Using CMSIS:
+\begin{lstlisting}[style=C, numbers=none]
+// Group priority = preemption, Sub-priority = tie-breaking
+NVIC_SetPriorityGrouping(3); // 4 bits preemption, 0 sub-priority
+
+NVIC_SetPriority(USART1_IRQn, 2);  // UART: priority 2 (higher)
+NVIC_SetPriority(TIM2_IRQn, 4);    // Timer 2: priority 4
+NVIC_SetPriority(SysTick_IRQn, 6); // SysTick: priority 6 (lowest)
+
+NVIC_EnableIRQ(USART1_IRQn);
+NVIC_EnableIRQ(TIM2_IRQn);
+\end{lstlisting}
+With these settings: UART (priority 2) can preempt Timer 2 (priority 4), and both can preempt SysTick (priority 6).
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:arch:practice}
+
+\begin{exercise}[Architecture Comparison]
+Draw a detailed block diagram of a modified Harvard architecture as used in ARM Cortex-M processors. Label the I-bus, D-bus, S-bus, and show how they connect to Flash, SRAM, and peripherals via the bus matrix.
+\end{exercise}
+
+\begin{exercise}[Pipeline Hazard Detection]
+Identify all data hazards in the following sequence and indicate which can be resolved by forwarding:
+\begin{lstlisting}[style=ARM, numbers=none]
+ADD R1, R2, R3
+SUB R4, R1, R5
+LDR R6, [R4]
+AND R7, R6, R1
+\end{lstlisting}
+\end{exercise}
+
+\begin{exercise}[CPI Calculation]
+A program consists of 40\% ALU instructions (1 cycle each), 30\% load instructions (1 cycle + 20\% cache miss rate causing 10-cycle penalty), 20\% store instructions (1 cycle), and 10\% branch instructions (1 cycle + 30\% misprediction causing 3-cycle penalty). Calculate the average CPI.
+\end{exercise}
+
+\begin{exercise}[ARM Assembly Programming]
+Write an ARM Cortex-M assembly routine that computes the factorial of a number in \reg{R0} (assume $0 \leq n \leq 12$) and returns the result in \reg{R0}.
+\end{exercise}
+
+\begin{exercise}[Interrupt Priority]
+Three interrupts arrive simultaneously on an ARM Cortex-M3: External IRQ 0 (priority 3), UART1 RX (priority 1), and Timer 3 (priority 5). In what order are they serviced? What happens if Timer 3's ISR is executing and UART1 RX fires?
+\end{exercise}
+
+\begin{exercise}[Memory Bandwidth]
+A processor runs at \freq{100}{MHz} with a 32-bit data bus. Calculate the peak memory bandwidth in MB/s. If the actual CPI is 1.5 and 35\% of instructions are load/store, what is the effective memory bandwidth utilisation?
+\end{exercise}
+
+\begin{exercise}[Addressing Mode Selection]
+For each operation below, choose the most efficient ARM addressing mode and write the instruction:
+\begin{enumerate}[label=(\alph*)]
+  \item Load a constant 0xFF into R0.
+  \item Access the 5th element of a word array whose base address is in R1.
+  \item Walk through an array, loading each element and advancing the pointer.
+  \item Access a peripheral register at a fixed address \hex{4001\_0000}.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[Branch Prediction Accuracy]
+A 2-bit predictor (initially ``Strongly Not Taken'') encounters the branch pattern T, T, NT, T, T, T, NT, T (T = taken, NT = not taken). Trace the predictor state for each branch and calculate the prediction accuracy.
+\end{exercise}

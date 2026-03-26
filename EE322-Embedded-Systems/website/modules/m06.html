@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M06 — Multitasking | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html" class="active">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#superloop">Super-Loop Limitations</a></li>
+        <li><a href="#threads">Processes &amp; Threads</a></li>
+        <li><a href="#context">Context Switching</a></li>
+        <li><a href="#ipc">Inter-Task Communication</a></li>
+        <li><a href="#freertos">FreeRTOS Example</a></li>
+        <li><a href="#sim-mt">Multitasking Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 06 — 2 Lecture Hours</div>
+        <h1 class="module-header__title">Multitasking</h1>
+      </div>
+
+      <section id="superloop" class="reveal">
+        <h2>Super-Loop Limitations</h2>
+        <p>The super-loop (<code>while(1)</code>) architecture processes all tasks sequentially. Response time to any event depends on the total loop period. Adding tasks increases worst-case latency for all other tasks.</p>
+        <pre><code class="language-c">while (1) {
+    read_sensors();      // 2 ms
+    process_data();      // 50 ms  ← blocks everything!
+    update_display();    // 5 ms
+    handle_comm();       // 3 ms
+}  // worst-case: 60 ms loop period</code></pre>
+      </section>
+
+      <section id="threads" class="reveal">
+        <h2>Processes &amp; Threads</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Thread States</div>
+          <p>A task transitions: <strong>New</strong> → <strong>Ready</strong> → <strong>Running</strong> → <strong>Blocked</strong> (waiting for event/mutex/delay) → back to <strong>Ready</strong> when event occurs → <strong>Terminated</strong> when deleted. On single-core, only one task is Running at any time.</p>
+        </div>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Race Conditions</div>
+          <p>Because threads share memory, concurrent access without synchronisation causes <strong>race conditions</strong> — bugs where output depends on unpredictable timing. Always protect shared resources with mutexes or critical sections.</p>
+        </div>
+      </section>
+
+      <section id="context" class="reveal">
+        <h2>Context Switching on ARM Cortex-M</h2>
+        <p>The <strong>PendSV</strong> exception handler performs context switches:</p>
+        <ol>
+          <li>Hardware automatically saves R0–R3, R12, LR, PC, xPSR (32 bytes) onto PSP</li>
+          <li>PendSV handler saves R4–R11 (32 bytes) via <code>STMDB</code></li>
+          <li>Current task's PSP stored in its TCB</li>
+          <li>Scheduler selects next task</li>
+          <li>New task's R4–R11 restored via <code>LDMIA</code></li>
+          <li>PSP set to new task's stack; <code>BX LR</code> triggers hardware restore</li>
+        </ol>
+        <p>Total overhead: ~80–100 cycles on Cortex-M4 at 168 MHz ≈ 0.5 μs.</p>
+      </section>
+
+      <section id="ipc" class="reveal">
+        <h2>Inter-Task Communication</h2>
+        <h3>Mutex</h3>
+        <p>Ensures mutual exclusion for shared resources. Supports <strong>priority inheritance</strong> to prevent unbounded priority inversion.</p>
+        <h3>Semaphore</h3>
+        <p><strong>Binary:</strong> Signalling between ISR and task. <strong>Counting:</strong> Control access to N identical resources.</p>
+        <h3>Message Queue</h3>
+        <p>FIFO buffer for safe data passing. Producer blocks if full; consumer blocks if empty.</p>
+
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Priority Inversion</div>
+          <p>When a high-priority task H waits for a mutex held by low-priority task L, and medium-priority task M preempts L, H is effectively blocked by M (inversion). <strong>Priority inheritance</strong> fixes this by temporarily boosting L to H's priority.</p>
+        </div>
+      </section>
+
+      <section id="freertos" class="reveal">
+        <h2>FreeRTOS Example</h2>
+        <pre><code class="language-c">#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+SemaphoreHandle_t xMutex;
+volatile uint32_t shared_counter = 0;
+
+void vTaskIncrement(void *p) {
+    for (;;) {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        shared_counter++;
+        xSemaphoreGive(xMutex);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+void vTaskDisplay(void *p) {
+    for (;;) {
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+        uint32_t val = shared_counter;
+        xSemaphoreGive(xMutex);
+        printf("Counter: %lu\n", val);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+int main(void) {
+    xMutex = xSemaphoreCreateMutex();
+    xTaskCreate(vTaskIncrement, "Inc",  256, NULL, 2, NULL);
+    xTaskCreate(vTaskDisplay,   "Disp", 256, NULL, 1, NULL);
+    vTaskStartScheduler();
+    for (;;);
+}</code></pre>
+      </section>
+
+      <!-- Multitasking Simulation -->
+      <section id="sim-mt" class="reveal">
+        <h2>Interactive: Multitasking Simulation</h2>
+        <div id="multitask-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">Task Execution Timeline</div>
+            <div class="sim-container__controls">
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="sim-container__canvas" id="multitask-canvas"></div>
+          <div class="control-group" style="padding: 0.75rem 1.25rem;">
+            <label>Tick Period</label>
+            <input type="range" min="1" max="10" step="1" value="5" data-control="tick">
+            <span class="value-display tick-display">5 ms</span>
+          </div>
+          <div class="stat-display" id="mt-stats">
+            <div class="stat-item"><div class="stat-item__value" id="mt-tick">0</div><div class="stat-item__label">Tick</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mt-switches">0</div><div class="stat-item__label">Switches</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mt-running">Idle</div><div class="stat-item__label">Running</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mt-util">0%</div><div class="stat-item__label">CPU Util</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_multitasking.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M01 — Introduction to Embedded Systems | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html" class="active">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <!-- Sidebar -->
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#definition">What Is an Embedded System?</a></li>
+        <li><a href="#domains">Application Domains</a></li>
+        <li><a href="#platforms">Platform Comparison</a></li>
+        <li><a href="#challenges">Design Challenges</a></li>
+        <li><a href="#casestudy">Case Study: ABS</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 01 — 2 Lecture Hours</div>
+        <h1 class="module-header__title">Introduction to Embedded Systems</h1>
+      </div>
+
+      <section id="definition" class="reveal">
+        <h2>What Is an Embedded System?</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p>An <strong>embedded system</strong> is a computer system with a dedicated function within a larger mechanical or electronic system. It is designed to perform specific tasks, often with real-time constraints, and typically includes a combination of hardware and software.</p>
+        </div>
+        <p>Embedded systems differ from general-purpose computers in several ways: they are optimised for a specific task, have constrained resources (CPU, memory, power), must often operate in real-time, and frequently interact with the physical world through sensors and actuators.</p>
+
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Key Insight</div>
+          <p>Over <strong>98%</strong> of all processors manufactured today are used in embedded systems — not in PCs or servers. From automotive ECUs and medical devices to smart appliances and industrial controllers, embedded systems are everywhere.</p>
+        </div>
+      </section>
+
+      <section id="domains" class="reveal">
+        <h2>Application Domains</h2>
+        <table>
+          <thead>
+            <tr><th>Domain</th><th>Examples</th><th>Key Constraints</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Automotive</td><td>ABS, engine control, ADAS</td><td>Safety (ISO 26262), real-time</td></tr>
+            <tr><td>Medical</td><td>Pacemakers, infusion pumps, MRI</td><td>Reliability, FDA approval</td></tr>
+            <tr><td>Consumer</td><td>Smart TVs, wearables, appliances</td><td>Cost, power, time-to-market</td></tr>
+            <tr><td>Industrial</td><td>PLCs, SCADA, robotics</td><td>Harsh environment, uptime</td></tr>
+            <tr><td>Aerospace</td><td>Fly-by-wire, satellite, avionics</td><td>DO-178C, radiation tolerance</td></tr>
+            <tr><td>Telecom</td><td>Base stations, routers, modems</td><td>Throughput, latency</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="platforms" class="reveal">
+        <h2>Platform Comparison</h2>
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>Typical Clock</th><th>RAM</th><th>Unit Cost</th><th>Power</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>8-bit MCU (ATmega328)</td><td>16 MHz</td><td>2 KB</td><td>&lt; $2</td><td>&lt; 10 mW</td></tr>
+            <tr><td>32-bit MCU (STM32F4)</td><td>168 MHz</td><td>192 KB</td><td>$5–10</td><td>~100 mW</td></tr>
+            <tr><td>SBC (Raspberry Pi 4)</td><td>1.5 GHz</td><td>4 GB</td><td>$35–55</td><td>3–6 W</td></tr>
+            <tr><td>Industrial PC</td><td>2+ GHz</td><td>8+ GB</td><td>$200+</td><td>20–65 W</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="challenges" class="reveal">
+        <h2>Design Challenges</h2>
+        <h3>Real-Time Constraints</h3>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p><strong>Hard real-time:</strong> Missing a deadline is a system failure (e.g., airbag deployment).<br>
+          <strong>Soft real-time:</strong> Missing a deadline degrades quality but is not catastrophic (e.g., video streaming).</p>
+        </div>
+
+        <h3>Resource Constraints</h3>
+        <p>Embedded designers must optimise for:</p>
+        <ul>
+          <li><strong>Memory:</strong> Limited Flash (code) and RAM (data). No virtual memory on most MCUs.</li>
+          <li><strong>Processing power:</strong> Must meet real-time deadlines with limited MIPS.</li>
+          <li><strong>Power:</strong> Battery-powered devices may need to run for years.</li>
+          <li><strong>Cost:</strong> Bill of Materials (BOM) is critical at scale.</li>
+        </ul>
+
+        <h3>Concurrent Engineering</h3>
+        <p>Hardware and software are developed in parallel — hardware may not be available when software development starts, requiring simulation, emulation, or development boards.</p>
+      </section>
+
+      <section id="casestudy" class="reveal">
+        <h2>Case Study: Anti-Lock Braking System (ABS)</h2>
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Example</div>
+          <p>An ABS system monitors wheel speed sensors and modulates brake pressure to prevent wheel lockup. The slip ratio is defined as:</p>
+          <p>$$\lambda = \frac{v_{\text{vehicle}} - v_{\text{wheel}}}{v_{\text{vehicle}}}$$</p>
+          <p>Optimal braking occurs at $\lambda \approx 0.15$–$0.20$. The ABS controller must:</p>
+          <ul>
+            <li>Read 4 wheel speed sensors every 5 ms (hard real-time)</li>
+            <li>Compute slip ratio for each wheel</li>
+            <li>Modulate hydraulic valve actuators within 10 ms</li>
+            <li>Operate from $-40°$C to $+125°$C</li>
+          </ul>
+          <p>This exemplifies a safety-critical, hard real-time embedded system.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+
+  <script src="../js/core.js"></script>
+</body>
+</html>

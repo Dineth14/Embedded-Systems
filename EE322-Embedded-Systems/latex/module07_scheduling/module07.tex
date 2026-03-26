@@ -1,0 +1,444 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 7: Task Scheduling
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Task Scheduling}
+\label{ch:scheduling}
+\chaptermark{Module 7}
+
+\begin{moduleinfo}
+  \textbf{Module:} 7 \quad
+  \textbf{Lecture Hours:} 2 \quad
+  \textbf{ILOs Addressed:} ILO-4, ILO-5 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Classify scheduling algorithms as static vs.\ dynamic, preemptive vs.\ cooperative.
+    \item Apply Rate Monotonic Scheduling (RMS) and Earliest Deadline First (EDF) to a task set.
+    \item Perform schedulability analysis using the utilisation bound test.
+    \item Construct Gantt charts for given task sets.
+    \item Discuss multiprocessor scheduling challenges and WCET estimation.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{Scheduling Fundamentals}
+\label{sec:sched:basics}
+
+\begin{definition}[Scheduling Algorithm]
+A scheduling algorithm determines, at each scheduling decision point, which ready task to execute next. The scheduler's goal is to ensure \textbf{all tasks meet their deadlines} while maximising CPU utilisation.
+\end{definition}
+
+\subsection{Task Model}
+
+A periodic real-time task $\tau_i$ is characterised by:
+\begin{itemize}[nosep]
+  \item $C_i$: Worst-case execution time (WCET)
+  \item $T_i$: Period
+  \item $D_i$: Relative deadline (typically $D_i = T_i$ for implicit-deadline tasks)
+\end{itemize}
+
+The \textbf{CPU utilisation} due to task $\tau_i$ is:
+\[
+U_i = \frac{C_i}{T_i}
+\]
+Total utilisation for $n$ tasks:
+\[
+U = \sum_{i=1}^{n} \frac{C_i}{T_i}
+\]
+
+\begin{important}[Necessary Condition for Schedulability]
+For any scheduling algorithm on a single processor: $U \leq 1$. If $U > 1$, no algorithm can schedule the task set without missing deadlines.
+\end{important}
+
+\subsection{Classification of Schedulers}
+
+\begin{table}[H]
+\centering
+\caption{Classification of scheduling algorithms.}
+\label{tab:sched:class}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Criterion} & \textbf{Options} \\
+\midrule
+Priority assignment & \emph{Static} (fixed at design time) vs.\ \emph{Dynamic} (changes at runtime) \\
+Preemption & \emph{Preemptive} (running task can be interrupted) vs.\ \emph{Non-preemptive} (runs to completion or yield) \\
+Trigger & \emph{Clock-driven} (decisions at tick) vs.\ \emph{Event-driven} (decisions on task arrival/completion) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------------
+\section{Rate Monotonic Scheduling (RMS)}
+\label{sec:sched:rms}
+
+\begin{definition}[Rate Monotonic Scheduling]
+RMS is a \textbf{static-priority, preemptive} scheduling algorithm where priorities are assigned inversely proportional to the period: the shorter the period, the higher the priority. RMS is \textbf{optimal} among fixed-priority algorithms for implicit-deadline periodic tasks (Liu \& Layland, 1973~\cite{liu1973}).
+\end{definition}
+
+\subsection{RMS Utilisation Bound}
+
+For $n$ implicit-deadline tasks, RMS guarantees schedulability if:
+\[
+U = \sum_{i=1}^{n} \frac{C_i}{T_i} \leq n\left(2^{1/n} - 1\right)
+\]
+
+\begin{table}[H]
+\centering
+\caption{Liu--Layland utilisation bound $U_{\mathrm{lub}}(n) = n(2^{1/n} - 1)$.}
+\label{tab:sched:ulub}
+\begin{tabular}{@{}cccccccc@{}}
+\toprule
+$n$ & 1 & 2 & 3 & 4 & 5 & 10 & $\infty$ \\
+\midrule
+$U_{\mathrm{lub}}$ & 1.000 & 0.828 & 0.780 & 0.757 & 0.743 & 0.718 & $\ln 2 = 0.693$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{insight}
+The utilisation bound converges to $\ln 2 \approx 0.693$ as $n \to \infty$. This is a \emph{sufficient} condition: if $U \leq U_{\mathrm{lub}}$, the task set is schedulable under RMS. If $U_{\mathrm{lub}} < U \leq 1$, the task set \emph{may or may not} be schedulable --- further analysis (e.g., response time analysis) is needed.
+\end{insight}
+
+\subsection{Response Time Analysis (RTA)}
+
+When the utilisation bound test is inconclusive, exact schedulability can be determined by computing the worst-case response time $R_i$ for each task:
+
+\[
+R_i = C_i + \sum_{j \in \mathrm{hp}(i)} \left\lceil \frac{R_i}{T_j} \right\rceil C_j
+\]
+
+where $\mathrm{hp}(i)$ is the set of tasks with higher priority than $\tau_i$. This is solved iteratively:
+
+\[
+R_i^{(k+1)} = C_i + \sum_{j \in \mathrm{hp}(i)} \left\lceil \frac{R_i^{(k)}}{T_j} \right\rceil C_j
+\]
+
+starting from $R_i^{(0)} = C_i$, until convergence or $R_i > D_i$.
+
+% ----------------------------------------------------------------------------
+\section{Earliest Deadline First (EDF)}
+\label{sec:sched:edf}
+
+\begin{definition}[Earliest Deadline First]
+EDF is a \textbf{dynamic-priority, preemptive} scheduling algorithm that always schedules the ready task with the nearest absolute deadline. EDF is \textbf{optimal} among all uniprocessor scheduling algorithms for preemptive, independent tasks.
+\end{definition}
+
+\textbf{Schedulability test:} For implicit-deadline tasks under EDF:
+\[
+U = \sum_{i=1}^{n} \frac{C_i}{T_i} \leq 1
+\]
+
+This is both necessary and sufficient---EDF can fully utilise the processor.
+
+\subsection{Comparison: RMS vs.\ EDF}
+
+\begin{table}[H]
+\centering
+\caption{Comparison of RMS and EDF scheduling algorithms.}
+\label{tab:sched:rms-vs-edf}
+\begin{tabularx}{\linewidth}{@{}lXX@{}}
+\toprule
+\textbf{Property} & \textbf{RMS} & \textbf{EDF} \\
+\midrule
+Priority type & Static (fixed at design) & Dynamic (changes at runtime) \\
+Optimality & Optimal among fixed-priority & Optimal among all uniprocessor \\
+Util.\ bound & $n(2^{1/n}-1) \to \ln 2$ & 1.0 (full utilisation) \\
+Overload behaviour & Predictable (lowest-priority task misses first) & Unpredictable (domino effect) \\
+Implementation & Simple (priority comparison) & Moderate (deadline tracking) \\
+Jitter & Higher for low-priority tasks & Lower and more uniform \\
+Industry adoption & Widely used (VxWorks, FreeRTOS) & Less common in safety-critical \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------------
+\section{Deadline Monotonic Scheduling (DMS)}
+\label{sec:sched:dms}
+
+\begin{definition}[Deadline Monotonic Scheduling]
+DMS is a \textbf{static-priority} algorithm where priorities are assigned inversely proportional to \emph{relative deadlines}: the shorter the deadline, the higher the priority. DMS is optimal among fixed-priority algorithms for \emph{constrained-deadline} tasks ($D_i \leq T_i$). For implicit-deadline tasks ($D_i = T_i$), DMS reduces to RMS.
+\end{definition}
+
+% ----------------------------------------------------------------------------
+\section{Gantt Charts}
+\label{sec:sched:gantt}
+
+Gantt charts visualise the schedule by showing which task occupies the CPU at each time instant.
+
+\begin{example}[RMS Gantt Chart]
+Given tasks: $\tau_1 = (C_1=1, T_1=4)$, $\tau_2 = (C_2=2, T_2=6)$, $\tau_3 = (C_3=3, T_3=12)$.
+Check schedulability and draw the RMS Gantt chart for the hyperperiod.
+
+\begin{solution}
+
+\textbf{Step 1: Assign priorities.} RMS: shorter period = higher priority.
+\[
+\text{Priority: } \tau_1 > \tau_2 > \tau_3
+\]
+
+\textbf{Step 2: Calculate utilisation.}
+\[
+U = \frac{1}{4} + \frac{2}{6} + \frac{3}{12} = 0.250 + 0.333 + 0.250 = 0.833
+\]
+
+Utilisation bound for $n=3$: $U_{\mathrm{lub}} = 3(2^{1/3}-1) = 0.780$.
+
+Since $U = 0.833 > 0.780$, the utilisation bound test is \emph{inconclusive}. We must perform detailed analysis.
+
+\textbf{Step 3: Response Time Analysis.}
+\begin{itemize}[nosep]
+  \item $R_1 = C_1 = 1 \leq D_1 = 4$ \checkmark
+  \item $R_2$: $R_2^{(0)} = 2$; $R_2^{(1)} = 2 + \lceil 2/4\rceil \times 1 = 2 + 1 = 3$; $R_2^{(2)} = 2 + \lceil 3/4\rceil \times 1 = 2 + 1 = 3$. Converged: $R_2 = 3 \leq 6$ \checkmark
+  \item $R_3$: $R_3^{(0)} = 3$; $R_3^{(1)} = 3 + \lceil 3/4\rceil \times 1 + \lceil 3/6\rceil \times 2 = 3 + 1 + 2 = 6$; $R_3^{(2)} = 3 + \lceil 6/4\rceil \times 1 + \lceil 6/6\rceil \times 2 = 3 + 2 + 2 = 7$; $R_3^{(3)} = 3 + \lceil 7/4\rceil \times 1 + \lceil 7/6\rceil \times 2 = 3 + 2 + 4 = 9$; $R_3^{(4)} = 3 + \lceil 9/4\rceil \times 1 + \lceil 9/6\rceil \times 2 = 3 + 3 + 4 = 10$; $R_3^{(5)} = 3 + \lceil 10/4\rceil \times 1 + \lceil 10/6\rceil \times 2 = 3 + 3 + 4 = 10$. Converged: $R_3 = 10 \leq 12$ \checkmark
+\end{itemize}
+
+All tasks schedulable!
+
+\textbf{Step 4: Gantt chart.} Hyperperiod: $\mathrm{lcm}(4, 6, 12) = 12$.
+
+% TikZ Gantt chart for RMS
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.45, every node/.style={font=\scriptsize}]
+  % Time axis
+  \draw[-{Stealth}, thick] (0,-0.3) -- (13,-0.3) node[right] {$t$};
+  \foreach \t in {0,...,12} {
+    \draw (\t,-0.5) -- (\t,-0.1);
+    \node[below] at (\t,-0.5) {\t};
+  }
+  
+  \node[anchor=east, font=\small\bfseries] at (-0.3, 0.5) {CPU};
+  
+  % RMS schedule: manually derived
+  % t=0: tau1(1), tau2(2), tau3 starts
+  % t=0-1: tau1
+  \fill[ee-blue!40] (0,0) rectangle (1,1);
+  \node at (0.5,0.5) {$\tau_1$};
+  
+  % t=1-3: tau2
+  \fill[ee-amber!40] (1,0) rectangle (3,1);
+  \node at (2,0.5) {$\tau_2$};
+  
+  % t=3-4: tau3 (runs 1 of 3 units)
+  \fill[ee-green!40] (3,0) rectangle (4,1);
+  \node at (3.5,0.5) {$\tau_3$};
+  
+  % t=4: tau1 arrives again
+  \fill[ee-blue!40] (4,0) rectangle (5,1);
+  \node at (4.5,0.5) {$\tau_1$};
+  
+  % t=5-6: tau3 (2 more units)
+  \fill[ee-green!40] (5,0) rectangle (6,1);
+  \node at (5.5,0.5) {$\tau_3$};
+  
+  % t=6: tau2 arrives again
+  \fill[ee-amber!40] (6,0) rectangle (7,1);
+  \node at (6.5,0.5) {$\tau_2$};
+  
+  % t=7: tau3 final unit
+  \fill[ee-green!40] (7,0) rectangle (8,1);
+  \node at (7.5,0.5) {$\tau_3$};
+  
+  % t=8: tau1 arrives
+  \fill[ee-blue!40] (8,0) rectangle (9,1);
+  \node at (8.5,0.5) {$\tau_1$};
+  
+  % t=9: tau2 continues
+  \fill[ee-amber!40] (9,0) rectangle (10,1);
+  \node at (9.5,0.5) {$\tau_2$};
+  
+  % t=10-12: idle / tau3 second instance
+  \fill[ee-green!30] (10,0) rectangle (12,1);
+  \node at (11,0.5) {$\tau_3$};
+  
+  % Task arrival arrows
+  \foreach \t in {0,4,8} {
+    \draw[-{Stealth}, ee-blue, thick] (\t, 1.6) -- (\t, 1.1);
+    \node[above, ee-blue] at (\t, 1.6) {$\tau_1$};
+  }
+  \foreach \t in {0,6} {
+    \draw[-{Stealth}, ee-amber, thick] (\t, 2.4) -- (\t, 1.9);
+    \node[above, ee-amber] at (\t, 2.4) {$\tau_2$};
+  }
+  \foreach \t in {0} {
+    \draw[-{Stealth}, ee-green!70!black, thick] (\t, 3.2) -- (\t, 2.7);
+    \node[above, ee-green!70!black] at (\t, 3.2) {$\tau_3$};
+  }
+  
+\end{tikzpicture}
+\caption{RMS Gantt chart for the task set over the hyperperiod $[0, 12)$.}
+\label{fig:sched:gantt-rms}
+\end{figure}
+
+\end{solution}
+\end{example}
+
+\begin{example}[EDF Gantt Chart]
+For the same task set $\tau_1 = (1,4)$, $\tau_2 = (2,6)$, $\tau_3 = (3,12)$, draw the EDF schedule.
+
+\begin{solution}
+
+Under EDF, absolute deadlines determine priority at each instant.
+
+\begin{itemize}[nosep]
+  \item $t=0$: Deadlines: $\tau_1:4$, $\tau_2:6$, $\tau_3:12$. Run $\tau_1$ (deadline 4).
+  \item $t=1$: $\tau_1$ done. Deadlines: $\tau_2:6$, $\tau_3:12$. Run $\tau_2$.
+  \item $t=3$: $\tau_2$ done. Run $\tau_3$.
+  \item $t=4$: $\tau_1$ arrives (deadline 8). $\tau_3$ has deadline 12. Preempt: run $\tau_1$.
+  \item $t=5$: $\tau_1$ done. Resume $\tau_3$.
+  \item $t=6$: $\tau_2$ arrives (deadline 12). $\tau_3$ has remaining 1 unit, deadline 12; $\tau_2$ deadline 12 (tie). Continue $\tau_3$.
+  \item $t=7$: $\tau_3$ done. Run $\tau_2$.
+  \item $t=8$: $\tau_1$ arrives (deadline 12). $\tau_2$ has 1 unit remaining, deadline 12. Continue $\tau_2$.
+  \item $t=9$: $\tau_2$ done. Run $\tau_1$.
+  \item $t=10$: $\tau_1$ done. Idle or $\tau_3$ second instance.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.45, every node/.style={font=\scriptsize}]
+  \draw[-{Stealth}, thick] (0,-0.3) -- (13,-0.3) node[right] {$t$};
+  \foreach \t in {0,...,12} {
+    \draw (\t,-0.5) -- (\t,-0.1);
+    \node[below] at (\t,-0.5) {\t};
+  }
+  
+  \node[anchor=east, font=\small\bfseries] at (-0.3, 0.5) {CPU};
+  
+  \fill[ee-blue!40] (0,0) rectangle (1,1);
+  \node at (0.5,0.5) {$\tau_1$};
+  
+  \fill[ee-amber!40] (1,0) rectangle (3,1);
+  \node at (2,0.5) {$\tau_2$};
+  
+  \fill[ee-green!40] (3,0) rectangle (4,1);
+  \node at (3.5,0.5) {$\tau_3$};
+  
+  \fill[ee-blue!40] (4,0) rectangle (5,1);
+  \node at (4.5,0.5) {$\tau_1$};
+  
+  \fill[ee-green!40] (5,0) rectangle (7,1);
+  \node at (6,0.5) {$\tau_3$};
+  
+  \fill[ee-amber!40] (7,0) rectangle (9,1);
+  \node at (8,0.5) {$\tau_2$};
+  
+  \fill[ee-blue!40] (9,0) rectangle (10,1);
+  \node at (9.5,0.5) {$\tau_1$};
+  
+  \fill[ee-green!30] (10,0) rectangle (12,1);
+  \node at (11,0.5) {$\tau_3$};
+  
+\end{tikzpicture}
+\caption{EDF schedule for the same task set. Note the different execution order due to dynamic priorities.}
+\label{fig:sched:gantt-edf}
+\end{figure}
+
+Both RMS and EDF succeed for this task set. EDF distributes slack more evenly.
+\end{solution}
+\end{example}
+
+\begin{example}[Schedulability Failure under RMS]
+Tasks: $\tau_1 = (C_1=2, T_1=5)$, $\tau_2 = (C_2=4, T_2=7)$. Check RMS schedulability.
+
+\begin{solution}
+$U = 2/5 + 4/7 = 0.400 + 0.571 = 0.971$.
+
+$U_{\mathrm{lub}}(2) = 2(\sqrt{2}-1) = 0.828$.
+
+Since $U = 0.971 > 0.828$, the bound test fails. Perform RTA:
+
+\textbf{$\tau_1$:} $R_1 = C_1 = 2 \leq 5$ \checkmark
+
+\textbf{$\tau_2$:} $R_2^{(0)} = 4$; $R_2^{(1)} = 4 + \lceil 4/5\rceil \times 2 = 4 + 2 = 6$; $R_2^{(2)} = 4 + \lceil 6/5\rceil \times 2 = 4 + 4 = 8$; $R_2^{(3)} = 4 + \lceil 8/5\rceil \times 2 = 4 + 4 = 8$. Converged: $R_2 = 8 > D_2 = 7$ {\color{ee-red}\ding{55}}
+
+$\tau_2$ misses its deadline under RMS!
+
+Under EDF: $U = 0.971 \leq 1.0$, so EDF can schedule this task set. This demonstrates EDF's superior utilisation capability.
+\end{solution}
+\end{example}
+
+\begin{example}[RMS with Blocking]
+A system has three tasks. Task $\tau_3$ (lowest priority) holds a mutex for 1 time unit that $\tau_1$ (highest priority) needs. With priority inheritance: calculate $R_1$ accounting for blocking.
+
+Task set: $\tau_1 = (C_1=1, T_1=5)$, $\tau_2 = (C_2=2, T_2=8)$, $\tau_3 = (C_3=3, T_3=15)$, blocking time $B_1 = 1$ (critical section of $\tau_3$).
+
+\begin{solution}
+The response time equation with blocking becomes:
+\[
+R_i = C_i + B_i + \sum_{j \in \mathrm{hp}(i)} \left\lceil \frac{R_i}{T_j} \right\rceil C_j
+\]
+
+For $\tau_1$: $R_1^{(0)} = C_1 + B_1 = 1 + 1 = 2$. No higher-priority tasks, so $R_1 = 2 \leq 5$ \checkmark.
+
+For $\tau_2$ (no blocking from $\tau_3$'s mutex, as $\tau_2$ doesn't use it): $R_2^{(0)} = 2$; $R_2^{(1)} = 2 + \lceil 2/5\rceil \times 1 = 2 + 1 = 3$; $R_2^{(2)} = 2 + \lceil 3/5\rceil = 3$. Converged: $R_2 = 3 \leq 8$ \checkmark.
+
+For $\tau_3$: $R_3^{(0)} = 3$; $R_3^{(1)} = 3 + \lceil 3/5\rceil(1) + \lceil 3/8\rceil(2) = 3 + 1 + 2 = 6$; $R_3^{(2)} = 3 + \lceil 6/5\rceil(1) + \lceil 6/8\rceil(2) = 3 + 2 + 2 = 7$; $R_3^{(3)} = 3 + \lceil 7/5\rceil(1) + \lceil 7/8\rceil(2) = 3 + 2 + 2 = 7$. Converged: $R_3 = 7 \leq 15$ \checkmark.
+
+All tasks meet deadlines even with blocking.
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Multiprocessor Scheduling}
+\label{sec:sched:multi}
+
+For systems with $m$ processors, two approaches exist:
+\begin{itemize}
+  \item \textbf{Partitioned scheduling:} Each task is statically assigned to one processor. Each processor uses a uniprocessor scheduler (RMS or EDF). No migration. Simple to implement.
+  \item \textbf{Global scheduling:} All tasks share a single ready queue. The $m$ highest-priority ready tasks run on the $m$ processors. Tasks may migrate between processors. Better utilisation but higher overhead and harder analysis.
+\end{itemize}
+
+\begin{important}[Dhall's Effect]
+Under global EDF on $m$ processors, utilisation can be as low as $\frac{m}{2m-1}$ (about 50\% for large $m$) while still missing deadlines. This counter-intuitive result shows that uniprocessor optimality does not extend to multiprocessors.
+\end{important}
+
+% ----------------------------------------------------------------------------
+\section{Worst-Case Execution Time (WCET)}
+\label{sec:sched:wcet}
+
+Accurate WCET estimation is critical for schedulability analysis.
+
+\textbf{Methods:}
+\begin{itemize}[nosep]
+  \item \textbf{Measurement-based:} Run the task many times, record the maximum. Risk: may miss the true worst case.
+  \item \textbf{Static analysis:} Analyse the binary's control flow and processor timing model (IPET --- Implicit Path Enumeration Technique). Conservative but safe. Tools: aiT, Bound-T.
+  \item \textbf{Hybrid:} Combine measurement of basic blocks with static analysis of paths.
+\end{itemize}
+
+\textbf{WCET challenges on modern processors:}
+\begin{itemize}[nosep]
+  \item Branch prediction (misprediction penalties)
+  \item Cache effects (cache misses add tens of cycles)
+  \item Pipeline stalls (data hazards, structural hazards)
+  \item On multi-core: shared bus/cache contention
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:sched:practice}
+
+\begin{exercise}[Basic Schedulability]
+Tasks: $\tau_1 = (C_1=1, T_1=3)$, $\tau_2 = (C_2=1, T_2=5)$, $\tau_3 = (C_3=2, T_3=15)$. (a) Compute the total utilisation. (b) Check schedulability under RMS using the utilisation bound. (c) Verify using RTA if the bound test fails. (d) Draw the Gantt chart for one hyperperiod under RMS.
+\end{exercise}
+
+\begin{exercise}[EDF vs.\ RMS]
+Tasks: $\tau_1 = (C_1=3, T_1=6)$, $\tau_2 = (C_2=3, T_2=8)$. (a) Show that this task set fails the RMS utilisation bound. (b) Determine using RTA whether it is actually schedulable under RMS. (c) Verify that it is schedulable under EDF. (d) Draw both Gantt charts.
+\end{exercise}
+
+\begin{exercise}[Response Time Analysis]
+Task set: $\tau_1 = (1, 4)$, $\tau_2 = (2, 5)$, $\tau_3 = (3, 20)$. An ISR adds blocking time $B_3 = 1$ to $\tau_3$. Compute $R_1$, $R_2$, and $R_3$ using RTA with blocking. Is the system schedulable?
+\end{exercise}
+
+\begin{exercise}[Multiprocessor Partitioning]
+Given 5 tasks with utilisations $\{0.3, 0.4, 0.5, 0.3, 0.4\}$ and 2 processors, partition the tasks using First-Fit Decreasing. What is the utilisation of each processor? Would global EDF be able to schedule this set?
+\end{exercise}
+
+\begin{exercise}[WCET Impact]
+A task has measured execution times of $\{120, 135, 128, 142, 131\}\,\mu$s over 1000 runs. (a) What WCET would you use for static analysis? (b) If the static analysis tool reports 180\,$\mu$s, discuss the implications of using 142\,$\mu$s vs.\ 180\,$\mu$s for schedulability analysis.
+\end{exercise}
+
+\begin{exercise}[Scheduler Design Trade-Off]
+A safety-critical automotive system controls ABS braking (deadline 2\,ms) and infotainment display updates (deadline 100\,ms). Argue whether RMS or EDF is more appropriate for this system, considering overload behaviour, certification requirements, and implementation complexity.
+\end{exercise}

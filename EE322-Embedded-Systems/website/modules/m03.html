@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M03 — Embedded Processors | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html" class="active">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#taxonomy">Processor Taxonomy</a></li>
+        <li><a href="#arm">ARM Cortex Family</a></li>
+        <li><a href="#baremetal">Bare-Metal Programming</a></li>
+        <li><a href="#toolchain">Cross-Compilation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 03 — 4 Lecture Hours</div>
+        <h1 class="module-header__title">Embedded Processors</h1>
+      </div>
+
+      <section id="taxonomy" class="reveal">
+        <h2>Processor Taxonomy</h2>
+        <table>
+          <thead><tr><th>Type</th><th>Strengths</th><th>Use Case</th></tr></thead>
+          <tbody>
+            <tr><td>MCU</td><td>Low cost, integrated peripherals, low power</td><td>IoT, motor control, sensing</td></tr>
+            <tr><td>DSP</td><td>MAC units, circular buffers, SIMD</td><td>Audio, radar, communications</td></tr>
+            <tr><td>FPGA</td><td>Hardware parallelism, reconfigurable</td><td>Prototyping, high-speed I/O</td></tr>
+            <tr><td>ASIC</td><td>Maximum performance/efficiency at scale</td><td>Mass-production SoCs</td></tr>
+            <tr><td>GPU/NPU</td><td>Massive parallelism, matrix ops</td><td>Edge AI, machine learning</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="arm" class="reveal">
+        <h2>ARM Cortex Family</h2>
+        <table>
+          <thead><tr><th>Profile</th><th>Series</th><th>Pipeline</th><th>Features</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td>Cortex-M</td><td>M0, M0+, M3, M4, M7, M33</td><td>2–6 stages</td><td>Thumb-2, NVIC, optional FPU/DSP</td><td>Microcontrollers</td></tr>
+            <tr><td>Cortex-R</td><td>R4, R5, R7, R8, R52</td><td>8–11 stages</td><td>TCM, ECC, dual-core lockstep</td><td>Real-time safety-critical</td></tr>
+            <tr><td>Cortex-A</td><td>A5, A7, A9, A53, A72, A78</td><td>8–13+ stages</td><td>MMU, cache, NEON SIMD, virtualization</td><td>Applications (Linux/Android)</td></tr>
+          </tbody>
+        </table>
+
+        <div class="theory-panel theory-panel--insight">
+          <div class="theory-panel__label">Insight</div>
+          <p><strong>CMSIS</strong> (Cortex Microcontroller Software Interface Standard) provides a vendor-independent hardware abstraction layer. It includes: core register access functions, SysTick timer interface, NVIC API, and DSP library functions. Using CMSIS improves code portability across Cortex-M devices from different vendors (ST, NXP, TI, Nordic, etc.).</p>
+        </div>
+      </section>
+
+      <section id="baremetal" class="reveal">
+        <h2>Bare-Metal C Programming</h2>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Key Concepts</div>
+          <p>Bare-metal programming means writing code that runs directly on hardware without an operating system. Critical patterns include:</p>
+          <ul>
+            <li><strong><code>volatile</code></strong>: Tell the compiler a variable may change unexpectedly (hardware registers, ISR-shared variables).</li>
+            <li><strong>Memory-mapped I/O</strong>: Peripheral registers accessed at specific addresses via pointers.</li>
+            <li><strong>Struct overlay</strong>: Map a C struct over a peripheral register block for readable access.</li>
+          </ul>
+        </div>
+        <pre><code class="language-c">// Memory-mapped GPIO register access
+#define GPIOA_BASE  0x40020000
+#define GPIOA_ODR   (*(volatile uint32_t *)(GPIOA_BASE + 0x14))
+
+// Toggle pin 5 (LED on Nucleo boards)
+GPIOA_ODR ^= (1 << 5);</code></pre>
+      </section>
+
+      <section id="toolchain" class="reveal">
+        <h2>Cross-Compilation Toolchain</h2>
+        <p>Embedded development uses a cross-compiler that runs on a host PC but generates code for the target MCU.</p>
+        <pre><code class="language-bash"># ARM GCC toolchain example
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard \
+    -mfpu=fpv4-sp-d16 -Os -Wall -c main.c -o main.o
+
+arm-none-eabi-ld -T linker_script.ld main.o startup.o -o firmware.elf
+
+arm-none-eabi-objcopy -O binary firmware.elf firmware.bin
+
+# Flash to target
+st-flash write firmware.bin 0x08000000</code></pre>
+        <p>Key toolchain components: compiler (<code>gcc</code>), assembler (<code>as</code>), linker (<code>ld</code>), library (<code>newlib-nano</code>), debugger (<code>gdb</code> + OpenOCD/J-Link).</p>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+</body>
+</html>

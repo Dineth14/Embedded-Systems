@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M07 — Task Scheduling | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html" class="active">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#overview">Scheduling Overview</a></li>
+        <li><a href="#rms">Rate-Monotonic (RMS)</a></li>
+        <li><a href="#edf">Earliest Deadline First</a></li>
+        <li><a href="#analysis">Schedulability Analysis</a></li>
+        <li><a href="#wcet">WCET &amp; Response Time</a></li>
+        <li><a href="#sim-sched">Scheduling Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 07 — 2 Lecture Hours</div>
+        <h1 class="module-header__title">Task Scheduling</h1>
+      </div>
+
+      <section id="overview" class="reveal">
+        <h2>Scheduling Overview</h2>
+        <p>Real-time scheduling assigns CPU time to tasks such that all timing constraints are met. A schedule is <strong>feasible</strong> iff every task meets every deadline.</p>
+        <table>
+          <thead>
+            <tr><th>Property</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>\(T_i\)</td><td>Period of task \(i\)</td></tr>
+            <tr><td>\(C_i\)</td><td>Worst-case execution time (WCET)</td></tr>
+            <tr><td>\(D_i\)</td><td>Relative deadline (often \(D_i = T_i\))</td></tr>
+            <tr><td>\(U_i = C_i / T_i\)</td><td>Utilisation of task \(i\)</td></tr>
+          </tbody>
+        </table>
+        <p>Total utilisation: \(U = \sum_{i=1}^{n} \frac{C_i}{T_i}\). Necessary condition: \(U \leq 1\).</p>
+      </section>
+
+      <section id="rms" class="reveal">
+        <h2>Rate-Monotonic Scheduling (RMS)</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">RMS Rule</div>
+          <p>Assign highest priority to the task with the shortest period. RMS is the <strong>optimal static-priority</strong> algorithm for periodic, preemptive, independent tasks with \(D = T\).</p>
+        </div>
+        <p>Liu &amp; Layland utilisation bound:</p>
+        <p>$$U_{\text{lub}} = n \left( 2^{1/n} - 1 \right)$$</p>
+        <table>
+          <thead><tr><th>n</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>∞</th></tr></thead>
+          <tbody><tr><td>\(U_{\text{lub}}\)</td><td>1.000</td><td>0.828</td><td>0.780</td><td>0.757</td><td>0.743</td><td>0.693</td></tr></tbody>
+        </table>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Key Insight</div>
+          <p>If \(U \leq U_{\text{lub}}\), all deadlines are <em>guaranteed</em> under RMS. If \(U_{\text{lub}} &lt; U \leq 1\), you must verify with Response-Time Analysis.</p>
+        </div>
+      </section>
+
+      <section id="edf" class="reveal">
+        <h2>Earliest Deadline First (EDF)</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">EDF Rule</div>
+          <p>At every scheduling decision, execute the ready task with the closest absolute deadline. EDF is the <strong>optimal dynamic-priority</strong> algorithm for preemptive uniprocessor systems.</p>
+        </div>
+        <p>Schedulability test: the task set is feasible under EDF iff:</p>
+        <p>$$U = \sum_{i=1}^{n} \frac{C_i}{T_i} \leq 1$$</p>
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">RMS vs EDF - Comparison</div>
+          <table>
+            <thead><tr><th>Feature</th><th>RMS</th><th>EDF</th></tr></thead>
+            <tbody>
+              <tr><td>Priority</td><td>Static (period-based)</td><td>Dynamic (deadline-based)</td></tr>
+              <tr><td>Utilisation bound</td><td>\(\approx 69\%\) (n→∞)</td><td>100%</td></tr>
+              <tr><td>Overhead</td><td>Low</td><td>Higher (priority recalc)</td></tr>
+              <tr><td>Overload</td><td>Predictable failures</td><td>Domino effect possible</td></tr>
+              <tr><td>RTOS Support</td><td>Most RTOS</td><td>Limited</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="analysis" class="reveal">
+        <h2>Schedulability Analysis</h2>
+        <h3>Response-Time Analysis (RTA)</h3>
+        <p>For fixed-priority scheduling, compute worst-case response time \(R_i\) iteratively:</p>
+        <p>$$R_i^{(k+1)} = C_i + \sum_{j \in hp(i)} \left\lceil \frac{R_i^{(k)}}{T_j} \right\rceil C_j$$</p>
+        <p>Start with \(R_i^{(0)} = C_i\) and iterate until convergence. Task \(i\) is schedulable iff \(R_i \leq D_i\).</p>
+
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Worked Example</div>
+          <p>Three tasks: \(\tau_1(T{=}10, C{=}3)\), \(\tau_2(T{=}15, C{=}4)\), \(\tau_3(T{=}20, C{=}5)\).</p>
+          <p>\(U = 0.3 + 0.267 + 0.25 = 0.817\). \(U_{\text{lub}}(3) = 0.780\) → exceeds bound, use RTA.</p>
+          <p>\(R_3^{(0)} = 5\), \(R_3^{(1)} = 5 + \lceil5/10\rceil\cdot3 + \lceil5/15\rceil\cdot4 = 5+3+4 = 12\), \(R_3^{(2)} = 5 + \lceil12/10\rceil\cdot3 + \lceil12/15\rceil\cdot4 = 5+6+4 = 15\), \(R_3^{(3)} = 5+6+4 = 15\) → converged. \(R_3 = 15 \leq 20\) ✓.</p>
+        </div>
+      </section>
+
+      <section id="wcet" class="reveal">
+        <h2>WCET &amp; Measurement</h2>
+        <p>Worst-Case Execution Time must be bounded for hard real-time tasks:</p>
+        <ul>
+          <li><strong>Static analysis:</strong> Abstract interpretation (e.g., aiT) — safe bounds, pessimistic</li>
+          <li><strong>Measurement-based:</strong> Hardware timers / DWT cycle counter — practical but finds observed WCET, not true WCET</li>
+          <li><strong>Hybrid:</strong> Combine both approaches</li>
+        </ul>
+        <pre><code class="language-c">// Measure with DWT cycle counter (Cortex-M)
+CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+DWT->CYCCNT = 0;
+DWT->CTRL   |= DWT_CTRL_CYCCNTENA_Msk;
+
+uint32_t start = DWT->CYCCNT;
+my_critical_function();
+uint32_t elapsed = DWT->CYCCNT - start;</code></pre>
+      </section>
+
+      <!-- Scheduling Simulation -->
+      <section id="sim-sched" class="reveal">
+        <h2>Interactive: Scheduling Simulation</h2>
+        <div id="sched-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">RMS / EDF Gantt Chart Generator</div>
+            <div class="sim-container__controls">
+              <select data-control="algorithm">
+                <option value="rms">Rate-Monotonic (RMS)</option>
+                <option value="edf">Earliest Deadline First (EDF)</option>
+              </select>
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="sim-container__canvas" id="sched-canvas"></div>
+          <div class="stat-display" id="sched-stats">
+            <div class="stat-item"><div class="stat-item__value" id="sched-time">0</div><div class="stat-item__label">Time</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="sched-util">0%</div><div class="stat-item__label">Utilisation</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="sched-misses">0</div><div class="stat-item__label">Deadline Misses</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="sched-preempt">0</div><div class="stat-item__label">Preemptions</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_scheduling.js"></script>
+</body>
+</html>

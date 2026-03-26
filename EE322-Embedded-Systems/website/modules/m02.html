@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M02 — Microprocessor &amp; Microcontroller Architecture | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html" class="active">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#architectures">Von Neumann vs Harvard</a></li>
+        <li><a href="#isa">CISC vs RISC</a></li>
+        <li><a href="#pipeline">Pipelining</a></li>
+        <li><a href="#branch">Branch Prediction</a></li>
+        <li><a href="#memory-map">Memory Map &amp; Interrupts</a></li>
+        <li><a href="#sim-pipeline">Pipeline Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 02 — 5 Lecture Hours</div>
+        <h1 class="module-header__title">Microprocessor &amp; Microcontroller Architecture</h1>
+      </div>
+
+      <section id="architectures" class="reveal">
+        <h2>Von Neumann vs Harvard Architecture</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition — Von Neumann</div>
+          <p>A computer architecture with a <strong>single bus</strong> shared between instruction and data memory. Simple but creates the "von Neumann bottleneck" — instructions and data compete for memory bandwidth.</p>
+        </div>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition — Harvard</div>
+          <p>A computer architecture with <strong>separate buses</strong> for instruction and data memory. Allows simultaneous instruction fetch and data access, enabling higher throughput. Used in most DSPs and ARM Cortex-M (modified Harvard).</p>
+        </div>
+        <table>
+          <thead><tr><th>Feature</th><th>Von Neumann</th><th>Harvard</th></tr></thead>
+          <tbody>
+            <tr><td>Memory buses</td><td>Single (shared)</td><td>Separate</td></tr>
+            <tr><td>Bandwidth</td><td>Lower (bottleneck)</td><td>Higher (parallel access)</td></tr>
+            <tr><td>Complexity</td><td>Simpler</td><td>More complex (more pins/buses)</td></tr>
+            <tr><td>Self-modifying code</td><td>Possible</td><td>Not possible (strict Harvard)</td></tr>
+            <tr><td>Examples</td><td>x86, original ARM</td><td>AVR, DSPs, ARM Cortex-M*</td></tr>
+          </tbody>
+        </table>
+        <p><em>*ARM Cortex-M uses a Modified Harvard architecture: separate I-bus and D-bus internally but a unified address space externally.</em></p>
+      </section>
+
+      <section id="isa" class="reveal">
+        <h2>CISC vs RISC</h2>
+        <table>
+          <thead><tr><th>Property</th><th>CISC</th><th>RISC</th></tr></thead>
+          <tbody>
+            <tr><td>Instructions</td><td>Many, complex, variable-length</td><td>Few, simple, fixed-length</td></tr>
+            <tr><td>Execution</td><td>Multi-cycle per instruction</td><td>Single-cycle (most instructions)</td></tr>
+            <tr><td>Memory access</td><td>Any instruction can access memory</td><td>Only load/store instructions</td></tr>
+            <tr><td>Registers</td><td>Few (8–16)</td><td>Many (16–32+)</td></tr>
+            <tr><td>Pipeline friendly</td><td>Harder</td><td>Easier</td></tr>
+            <tr><td>Examples</td><td>x86, 8051</td><td>ARM, MIPS, RISC-V</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="pipeline" class="reveal">
+        <h2>Pipelining</h2>
+        <div class="theory-panel theory-panel--theorem">
+          <div class="theory-panel__label">Concept</div>
+          <p>A <strong>pipeline</strong> overlaps the execution of multiple instructions. A classic 5-stage pipeline: <strong>IF</strong> (Instruction Fetch) → <strong>ID</strong> (Instruction Decode) → <strong>EX</strong> (Execute) → <strong>MEM</strong> (Memory Access) → <strong>WB</strong> (Write Back).</p>
+          <p>Ideal speedup with $k$ stages: $S = k$ (when the pipeline is full). In practice, <strong>hazards</strong> reduce this:</p>
+          <ul>
+            <li><strong>Data hazards:</strong> Instruction depends on result not yet written back. Solved by forwarding/bypassing or stalling.</li>
+            <li><strong>Control hazards:</strong> Branch target unknown until later stages. Solved by branch prediction.</li>
+            <li><strong>Structural hazards:</strong> Two instructions need the same hardware unit. Solved by resource duplication.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="branch" class="reveal">
+        <h2>Branch Prediction</h2>
+        <p>A <strong>2-bit saturating counter</strong> branch predictor maintains a state machine per branch:</p>
+        <ul>
+          <li><strong>Strongly Not Taken (00)</strong> → <strong>Weakly Not Taken (01)</strong> → <strong>Weakly Taken (10)</strong> → <strong>Strongly Taken (11)</strong></li>
+          <li>Two consecutive mispredictions needed to change the prediction direction.</li>
+          <li>Accuracy: 85–95% for typical embedded code.</li>
+        </ul>
+        <p>The ARM Cortex-M3 pipeline (3 stages: Fetch, Decode, Execute) uses a simpler branch predictor with branch target folding to minimise the branch penalty to 1 cycle.</p>
+      </section>
+
+      <section id="memory-map" class="reveal">
+        <h2>ARM Cortex-M Memory Map &amp; Interrupts</h2>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Memory Map</div>
+          <p>All Cortex-M processors share a common memory map:</p>
+          <ul>
+            <li><code>0x00000000</code>–<code>0x1FFFFFFF</code>: Code region (Flash, 512 MB)</li>
+            <li><code>0x20000000</code>–<code>0x3FFFFFFF</code>: SRAM (512 MB)</li>
+            <li><code>0x40000000</code>–<code>0x5FFFFFFF</code>: Peripherals</li>
+            <li><code>0xE0000000</code>–<code>0xFFFFFFFF</code>: System (NVIC, SysTick, debug)</li>
+          </ul>
+        </div>
+        <h3>NVIC (Nested Vectored Interrupt Controller)</h3>
+        <p>The NVIC supports configurable priority levels (8–256 levels depending on implementation). Key features:</p>
+        <ul>
+          <li><strong>Tail-chaining:</strong> Back-to-back ISR execution without full context save/restore (6 cycles).</li>
+          <li><strong>Late arrival:</strong> If a higher-priority interrupt arrives during stacking, the NVIC switches to the higher-priority ISR directly.</li>
+          <li><strong>Deterministic latency:</strong> 12 cycles from interrupt assertion to first ISR instruction on Cortex-M3/M4.</li>
+        </ul>
+      </section>
+
+      <!-- ---- Pipeline Simulation ---- -->
+      <section id="sim-pipeline" class="reveal">
+        <h2>Interactive: Fetch-Execute Pipeline Simulation</h2>
+        <div id="pipeline-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">5-Stage Pipeline Visualizer</div>
+            <div class="sim-container__controls">
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="sim-container__canvas" id="pipeline-canvas"></div>
+          <div class="control-group" style="padding: 0.75rem 1.25rem;">
+            <label>Speed</label>
+            <input type="range" min="0.5" max="4" step="0.5" value="1" data-control="speed">
+            <span class="value-display speed-display">1x</span>
+          </div>
+          <div class="stat-display" id="pipeline-stats">
+            <div class="stat-item"><div class="stat-item__value" id="stat-cycle">0</div><div class="stat-item__label">Cycle</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="stat-completed">0</div><div class="stat-item__label">Completed</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="stat-stalls">0</div><div class="stat-item__label">Stalls</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="stat-cpi">-</div><div class="stat-item__label">CPI</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_fetch_execute.js"></script>
+</body>
+</html>

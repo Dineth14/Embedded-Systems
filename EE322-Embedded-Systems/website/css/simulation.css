@@ -1,0 +1,319 @@
+/* ============================================================================
+   EE322 — Simulation-Specific Styles
+   ============================================================================ */
+
+/* ---- Pipeline Visualization ---- */
+.pipeline-stage {
+  fill: var(--bg-card);
+  stroke: var(--border-default);
+  stroke-width: 1.5;
+  rx: 4;
+}
+.pipeline-stage.active {
+  fill: var(--green-glow);
+  stroke: var(--green);
+  stroke-width: 2;
+}
+.pipeline-stage.stall {
+  fill: var(--red-glow);
+  stroke: var(--red);
+}
+.pipeline-stage.flush {
+  fill: var(--amber-glow);
+  stroke: var(--amber);
+}
+.pipeline-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--text-primary);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.pipeline-instr {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--green);
+}
+
+/* ---- Memory Hierarchy ---- */
+.mem-level {
+  transition: fill var(--transition-fast), stroke var(--transition-fast);
+}
+.mem-level.hit {
+  fill: var(--green-glow);
+  stroke: var(--green);
+}
+.mem-level.miss {
+  fill: var(--red-glow);
+  stroke: var(--red);
+}
+.mem-level.searching {
+  fill: var(--amber-glow);
+  stroke: var(--amber);
+  animation: mem-pulse 0.6s ease infinite alternate;
+}
+@keyframes mem-pulse {
+  from { opacity: 0.7; }
+  to   { opacity: 1; }
+}
+
+.cache-line {
+  fill: var(--bg-tertiary);
+  stroke: var(--border-default);
+  stroke-width: 1;
+  rx: 2;
+}
+.cache-line.valid {
+  fill: var(--blue-glow);
+  stroke: var(--blue);
+}
+.cache-line.highlight {
+  fill: var(--green-glow);
+  stroke: var(--green);
+  stroke-width: 2;
+}
+.cache-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-secondary);
+  text-anchor: middle;
+}
+
+/* ---- I/O Timing Waveform ---- */
+.waveform-bg {
+  fill: var(--bg-secondary);
+}
+.waveform-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 4;
+}
+.waveform-signal {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.waveform-signal.clk  { stroke: var(--text-muted); }
+.waveform-signal.mosi { stroke: var(--green); }
+.waveform-signal.miso { stroke: var(--blue); }
+.waveform-signal.cs   { stroke: var(--amber); }
+.waveform-signal.sda  { stroke: var(--green); }
+.waveform-signal.scl  { stroke: var(--blue); }
+.waveform-signal.tx   { stroke: var(--green); }
+.waveform-signal.rx   { stroke: var(--blue); }
+
+.waveform-bit-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  fill: var(--text-secondary);
+  text-anchor: middle;
+}
+.waveform-signal-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--text-primary);
+  text-anchor: end;
+  dominant-baseline: central;
+}
+.waveform-cursor {
+  stroke: var(--red);
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+  pointer-events: none;
+}
+
+/* ---- Multitasking / Context Switch ---- */
+.task-bar {
+  rx: 3;
+  transition: opacity var(--transition-fast);
+}
+.task-bar:hover {
+  opacity: 0.85;
+}
+.task-bar.task-0 { fill: var(--blue); }
+.task-bar.task-1 { fill: var(--green); }
+.task-bar.task-2 { fill: var(--amber); }
+.task-bar.task-3 { fill: var(--red); }
+.task-bar.idle   { fill: var(--bg-tertiary); stroke: var(--border-default); stroke-width: 1; }
+
+.task-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--text-primary);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.context-switch-marker {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+/* ---- Scheduling Gantt Chart ---- */
+.gantt-row {
+  fill: transparent;
+}
+.gantt-row:nth-child(even) {
+  fill: var(--bg-secondary);
+}
+.gantt-deadline {
+  stroke: var(--red);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.gantt-arrival {
+  fill: var(--text-muted);
+}
+.gantt-exec {
+  rx: 2;
+  opacity: 0.9;
+}
+.gantt-exec.preempted {
+  opacity: 0.4;
+  stroke: var(--text-muted);
+  stroke-dasharray: 2 2;
+}
+.gantt-time-axis {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+}
+.gantt-tick-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+}
+.gantt-task-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  fill: var(--text-primary);
+  text-anchor: end;
+  dominant-baseline: central;
+}
+
+/* ---- UML / State Machine ---- */
+.uml-state {
+  fill: var(--bg-card);
+  stroke: var(--border-default);
+  stroke-width: 1.5;
+  rx: 8;
+  transition: fill var(--transition-fast), stroke var(--transition-fast);
+}
+.uml-state.active {
+  fill: var(--green-glow);
+  stroke: var(--green);
+  stroke-width: 2.5;
+}
+.uml-state.composite {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-dasharray: 6 3;
+}
+.uml-state-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  fill: var(--text-primary);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.uml-transition {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  marker-end: url(#arrowhead);
+}
+.uml-transition.active {
+  stroke: var(--green);
+  stroke-width: 2;
+}
+.uml-transition-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-muted);
+}
+.uml-initial {
+  fill: var(--text-primary);
+}
+.uml-final-outer {
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-width: 1.5;
+}
+.uml-final-inner {
+  fill: var(--text-primary);
+}
+
+/* ---- Stats / Metric Displays ---- */
+.stat-display {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+}
+.stat-item {
+  text-align: center;
+}
+.stat-item__value {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--green);
+  font-weight: 600;
+}
+.stat-item__label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---- Simulation Log / Console ---- */
+.sim-log {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin-top: 1rem;
+}
+.sim-log__entry {
+  margin-bottom: 2px;
+}
+.sim-log__entry--info { color: var(--text-secondary); }
+.sim-log__entry--hit  { color: var(--green); }
+.sim-log__entry--miss { color: var(--red); }
+.sim-log__entry--event { color: var(--amber); }
+.sim-log__timestamp {
+  color: var(--text-muted);
+  margin-right: 0.5rem;
+}
+
+/* ---- Tooltip ---- */
+.sim-tooltip {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  z-index: var(--z-overlay);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.sim-tooltip.visible {
+  opacity: 1;
+}

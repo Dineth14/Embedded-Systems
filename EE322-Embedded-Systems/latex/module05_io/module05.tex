@@ -1,0 +1,607 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 5: I/O Ports
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{I/O Ports}
+\label{ch:io}
+\chaptermark{Module 5}
+
+\begin{moduleinfo}
+  \textbf{Module:} 5 \quad
+  \textbf{Lecture Hours:} 2 \quad
+  \textbf{ILOs Addressed:} ILO-3, ILO-4 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Configure GPIO pins for digital input/output with pull-up/pull-down resistors.
+    \item Compare polling, interrupt-driven, and DMA-based I/O strategies.
+    \item Describe ADC and DAC operation, including resolution, sampling, and reconstruction.
+    \item Draw and interpret timing diagrams for UART, SPI, and I\textsuperscript{2}C protocols.
+    \item Write driver code for serial communication peripherals.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{I/O Hardware}
+\label{sec:io:hw}
+
+\subsection{Digital GPIO}
+
+General-Purpose I/O pins can be configured as:
+\begin{itemize}
+  \item \textbf{Input mode:} High-impedance state reads external voltage. Options:
+    \begin{itemize}[nosep]
+      \item \textbf{Floating:} No internal resistor; susceptible to noise if unconnected.
+      \item \textbf{Pull-up:} Internal resistor to V$_{DD}$ ($\sim$40\,k$\Omega$); pin reads HIGH when undriven.
+      \item \textbf{Pull-down:} Internal resistor to GND; pin reads LOW when undriven.
+    \end{itemize}
+  \item \textbf{Output mode:}
+    \begin{itemize}[nosep]
+      \item \textbf{Push-pull:} Actively drives both HIGH and LOW. Most common.
+      \item \textbf{Open-drain:} Drives LOW or floats (requires external pull-up for HIGH). Used for I\textsuperscript{2}C, level shifting, wired-OR bus sharing.
+    \end{itemize}
+  \item \textbf{Alternate function:} Pin connects to an on-chip peripheral (UART TX, SPI CLK, etc.) instead of the GPIO data register.
+  \item \textbf{Analog mode:} Pin connects directly to ADC/DAC input; digital input buffer disabled to reduce power.
+\end{itemize}
+
+\subsection{Analog I/O}
+
+\begin{itemize}
+  \item \textbf{ADC (Analog-to-Digital Converter):} Converts a continuous analog voltage to a discrete digital value. Common types:
+    \begin{itemize}[nosep]
+      \item \textbf{SAR (Successive Approximation Register):} Most common in MCUs. 12-bit resolution, 1--5\,MSPS.
+      \item \textbf{Sigma-Delta ($\Sigma\Delta$):} Very high resolution (16--24 bits) but slower. Used for precision measurement.
+    \end{itemize}
+  \item \textbf{DAC (Digital-to-Analog Converter):} Converts a digital value to an analog voltage. Typically 12-bit on STM32. Used for waveform generation, audio output, and control voltage.
+\end{itemize}
+
+\subsection{Signal Conditioning}
+
+Between the physical sensor and the MCU:
+\begin{itemize}[nosep]
+  \item \textbf{Op-amp buffer:} Impedance matching, preventing the sensor from being loaded by the ADC.
+  \item \textbf{Level shifting:} Converting 5\,V sensor output to 3.3\,V MCU input (resistor divider or dedicated level shifter IC).
+  \item \textbf{Anti-aliasing filter:} Low-pass filter before ADC to attenuate frequencies above $f_s/2$ (Nyquist).
+  \item \textbf{ESD protection:} TVS diodes or clamping diodes on external-facing pins.
+\end{itemize}
+
+% TikZ: SAR ADC block diagram
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=2cm, minimum height=1cm, align=center, font=\small, fill=ee-blue!8},
+    arrow/.style={-{Stealth[length=2.5mm]}, thick}
+  ]
+  
+  \node[block] (sh) at (0,0) {Sample\\and Hold};
+  \node[block] (comp) at (3,0) {Comparator};
+  \node[block, fill=ee-green!10] (sar) at (6,0) {SAR\\Logic};
+  \node[block, fill=ee-amber!10] (dac) at (3,-2) {Internal\\DAC};
+  \node[block, fill=ee-red!10] (out) at (9,0) {Output\\Register};
+  
+  % Inputs
+  \node[anchor=east] (vin) at (-2,0) {$V_{\text{in}}$};
+  \draw[arrow] (vin) -- (sh);
+  \draw[arrow] (sh) -- (comp) node[midway, above, font=\scriptsize] {$V_{\text{sample}}$};
+  \draw[arrow] (comp) -- (sar) node[midway, above, font=\scriptsize] {$>$ or $<$};
+  \draw[arrow] (sar) -- (out) node[midway, above, font=\scriptsize] {$N$-bit result};
+  
+  % Feedback
+  \draw[arrow] (sar.south) -- ++(0,-0.5) -| (dac.east) node[pos=0.3, right, font=\scriptsize] {Trial bits};
+  \draw[arrow] (dac.north) -- (comp.south) node[midway, right, font=\scriptsize] {$V_{\text{DAC}}$};
+  
+  % Reference
+  \node[anchor=east, font=\small] at (-2,-2) {$V_{\text{ref}}$};
+  \draw[arrow] (-2,-2) -- (dac.west);
+  
+  % Clock
+  \draw[arrow] (6,1.5) -- (sar.north) node[above] {\scriptsize CLK};
+  
+\end{tikzpicture}
+\caption{SAR ADC block diagram: successive approximation register with internal DAC feedback.}
+\label{fig:io:saradc}
+\end{figure}
+
+% ----------------------------------------------------------------------------
+\section{Microprocessor/Microcontroller Interfacing}
+\label{sec:io:interfacing}
+
+\subsection{Polling vs.\ Interrupt-Driven I/O vs.\ DMA}
+
+\begin{table}[H]
+\centering
+\caption{I/O strategies comparison.}
+\label{tab:io:strategies}
+\begin{tabularx}{\textwidth}{l X X X}
+\toprule
+\textbf{Aspect} & \textbf{Polling} & \textbf{Interrupt} & \textbf{DMA} \\
+\midrule
+CPU involvement & Continuous checking & On event only & Setup only \\
+Latency & Variable (depends on poll rate) & Deterministic (ISR latency) & Near-zero CPU latency \\
+CPU utilisation & Wastes cycles waiting & Efficient & Most efficient \\
+Complexity & Simple & Moderate (ISR design) & Complex (coherency) \\
+Throughput & Low & Medium & Highest \\
+Use case & Simple, low-rate I/O & Most peripheral I/O & High-speed data transfer \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{ISR Design Rules}
+
+\begin{important}[Golden Rules for Interrupt Service Routines]
+\begin{enumerate}[nosep]
+  \item \textbf{Keep ISRs short:} Do minimal work; defer heavy processing to main loop or a task.
+  \item \textbf{No blocking calls:} Never call \texttt{delay()}, \texttt{printf()}, or \texttt{malloc()} in an ISR.
+  \item \textbf{Use volatile for shared data:} Any variable written in an ISR and read in main code must be \texttt{volatile}.
+  \item \textbf{Clear the interrupt flag:} Most peripherals require software to clear the pending bit, or the ISR will re-trigger infinitely.
+  \item \textbf{Avoid priority inversion:} Assign priorities thoughtfully; higher-rate interrupts get higher priority.
+\end{enumerate}
+\end{important}
+
+\subsection{GPIO Register Programming}
+
+\textbf{AVR style} (ATmega328P):
+\begin{itemize}[nosep]
+  \item \reg{DDRx}: Data Direction Register (0 = input, 1 = output).
+  \item \reg{PORTx}: Output data / pull-up enable.
+  \item \reg{PINx}: Input data (read pin state).
+\end{itemize}
+
+\textbf{STM32 style} (Cortex-M):
+\begin{itemize}[nosep]
+  \item \reg{GPIOx\_MODER}: Mode register (00 = input, 01 = output, 10 = AF, 11 = analog), 2 bits per pin.
+  \item \reg{GPIOx\_ODR}: Output Data Register.
+  \item \reg{GPIOx\_IDR}: Input Data Register.
+  \item \reg{GPIOx\_BSRR}: Bit Set/Reset Register (atomic set/reset).
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Analog and Digital Interfaces}
+\label{sec:io:analog}
+
+\subsection{ADC: Resolution and Sampling}
+
+For an $N$-bit ADC with reference voltage $V_{\text{ref}}$:
+\[
+  \text{LSB} = \frac{V_{\text{ref}}}{2^N}, \quad D = \left\lfloor \frac{V_{\text{in}} \times 2^N}{V_{\text{ref}}} \right\rfloor
+\]
+
+\begin{itemize}
+  \item \textbf{ENOB (Effective Number of Bits):} Accounts for noise and non-linearity. Typically 0.5--2 bits less than nominal resolution.
+  \item \textbf{SNR:} $\text{SNR} = 6.02 \times \text{ENOB} + 1.76\,\text{dB}$.
+  \item \textbf{Sampling Theorem:} $f_s \geq 2 f_{\text{max}}$ (Nyquist rate). In practice, oversample by 4--10$\times$.
+  \item \textbf{Anti-aliasing filter:} Must attenuate signal components above $f_s/2$ before the ADC samples.
+\end{itemize}
+
+\subsection{PWM (Pulse Width Modulation)}
+
+PWM generates a digital waveform with variable duty cycle:
+\[
+  V_{\text{avg}} = V_{DD} \times \frac{t_{\text{on}}}{T} = V_{DD} \times D
+\]
+where $D$ is the duty cycle (0--100\%). Used for motor speed control, LED dimming, and as a poor-man's DAC (with low-pass filter).
+
+Timer-based PWM: A hardware timer counts up to a period value (ARR). The output pin goes HIGH when counter $<$ compare value (CCR), and LOW otherwise.
+
+\begin{lstlisting}[style=C, caption={ADC read with polling on STM32.}]
+uint16_t adc_read_channel(uint8_t channel) {
+    ADC1->SQR3 = channel;           // Select channel
+    ADC1->CR2 |= ADC_CR2_SWSTART;   // Start conversion
+    
+    while (!(ADC1->SR & ADC_SR_EOC))  // Poll for end-of-conversion
+        ;
+    
+    return (uint16_t)ADC1->DR;       // Read 12-bit result
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=C, caption={ADC read with interrupt on STM32.}]
+volatile uint16_t adc_result;
+volatile uint8_t  adc_ready = 0;
+
+void ADC_IRQHandler(void) {
+    if (ADC1->SR & ADC_SR_EOC) {
+        adc_result = (uint16_t)ADC1->DR;  // Read clears EOC flag
+        adc_ready = 1;
+    }
+}
+
+void adc_start_conversion(uint8_t channel) {
+    ADC1->SQR3 = channel;
+    ADC1->CR1 |= ADC_CR1_EOCIE;     // Enable end-of-conversion interrupt
+    ADC1->CR2 |= ADC_CR2_SWSTART;
+}
+\end{lstlisting}
+
+% ----------------------------------------------------------------------------
+\section{Sequential Interfaces}
+\label{sec:io:serial}
+
+\subsection{UART (Universal Asynchronous Receiver/Transmitter)}
+
+UART is an asynchronous (no shared clock) serial protocol:
+
+% TikZ: UART frame format
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.7]
+  % Idle HIGH
+  \draw[thick] (0,1.5) -- (1,1.5);
+  \node[above, font=\scriptsize] at (0.5,1.5) {Idle};
+  
+  % Start bit (LOW)
+  \draw[thick] (1,1.5) -- (1,0) -- (2,0);
+  \node[below, font=\scriptsize, text=ee-red] at (1.5,0) {Start};
+  
+  % Data bits D0-D7
+  \foreach \i/\val in {0/1, 1/0, 2/1, 3/1, 4/0, 5/0, 6/1, 7/0} {
+    \pgfmathsetmacro{\x}{2 + \i}
+    \pgfmathsetmacro{\xn}{3 + \i}
+    \pgfmathsetmacro{\y}{\val * 1.5}
+    \pgfmathsetmacro{\yprev}{ifthenelse(\i == 0, 0, (\val * 1.5))}
+    \draw[thick, ee-blue] (\x, \y) -- (\xn, \y);
+    \node[above, font=\tiny, text=ee-blue] at ({\x+0.5}, 1.7) {D\i};
+  }
+  % Connect data bit transitions
+  \draw[thick, ee-blue] (2,0) -- (2,1.5);    % Start->D0(1)
+  \draw[thick, ee-blue] (3,1.5) -- (3,0);    % D0(1)->D1(0)
+  \draw[thick, ee-blue] (4,0) -- (4,1.5);    % D1(0)->D2(1)
+  \draw[thick, ee-blue] (5,1.5) -- (5,1.5);  % D2(1)->D3(1) same
+  \draw[thick, ee-blue] (6,1.5) -- (6,0);    % D3(1)->D4(0)
+  \draw[thick, ee-blue] (7,0) -- (7,0);      % D4(0)->D5(0) same
+  \draw[thick, ee-blue] (8,0) -- (8,1.5);    % D5(0)->D6(1)
+  \draw[thick, ee-blue] (9,1.5) -- (9,0);    % D6(1)->D7(0)
+  
+  % Parity bit
+  \draw[thick, ee-amber] (10,0) -- (10,1.5) -- (11,1.5);
+  \node[above, font=\scriptsize, text=ee-amber] at (10.5,1.7) {P};
+  
+  % Stop bit (HIGH)
+  \draw[thick, ee-green!70!black] (11,1.5) -- (12,1.5);
+  \node[above, font=\scriptsize, text=ee-green!70!black] at (11.5,1.7) {Stop};
+  
+  % Continue idle
+  \draw[thick] (12,1.5) -- (13,1.5);
+  \node[above, font=\scriptsize] at (12.5,1.5) {Idle};
+  
+  % Bit time annotation
+  \draw[{Stealth}-{Stealth}, thin] (1,-0.8) -- (2,-0.8);
+  \node[below, font=\scriptsize] at (1.5,-0.8) {$T_{\text{bit}} = 1/\text{baud}$};
+  
+  % Frame annotation
+  \draw[{Stealth}-{Stealth}, ee-red, thin] (1,-1.5) -- (12,-1.5);
+  \node[below, font=\scriptsize, text=ee-red] at (6.5,-1.5) {Frame: Start + 8 data + Parity + Stop = 11 bits};
+  
+\end{tikzpicture}
+\caption{UART frame format: idle HIGH, start bit (LOW), 8 data bits (LSB first), optional parity, stop bit (HIGH).}
+\label{fig:io:uart}
+\end{figure}
+
+Baud rate = bits per second. Common: 9600, 115200, 921600. RS-232 uses $\pm$12\,V signaling; TTL UART uses 0/3.3\,V.
+
+\subsection{SPI (Serial Peripheral Interface)}
+
+SPI is a synchronous, full-duplex, 4-wire protocol:
+\begin{itemize}[nosep]
+  \item \pin{MOSI}: Master Out, Slave In (data from master to slave).
+  \item \pin{MISO}: Master In, Slave Out (data from slave to master).
+  \item \pin{SCK}: Serial Clock (generated by master).
+  \item \pin{CS} (or \pin{SS}): Chip Select (active low), selects the slave device.
+\end{itemize}
+
+Four SPI modes defined by clock polarity (CPOL) and clock phase (CPHA):
+
+\begin{table}[H]
+\centering
+\caption{SPI modes.}
+\begin{tabular}{c c c l}
+\toprule
+\textbf{Mode} & \textbf{CPOL} & \textbf{CPHA} & \textbf{Description} \\
+\midrule
+0 & 0 & 0 & Clock idle LOW, sample on rising edge \\
+1 & 0 & 1 & Clock idle LOW, sample on falling edge \\
+2 & 1 & 0 & Clock idle HIGH, sample on falling edge \\
+3 & 1 & 1 & Clock idle HIGH, sample on rising edge \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% TikZ: SPI timing diagram
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.55, every node/.style={font=\scriptsize}]
+  
+  % --- Mode 0 (CPOL=0, CPHA=0) ---
+  \node[font=\small\bfseries] at (-2, 3) {Mode 0};
+  
+  % CS (active low)
+  \draw[thick] (0,4.5) -- (0.5,4.5) -- (0.5,3.8) -- (16.5,3.8) -- (16.5,4.5) -- (17,4.5);
+  \node[anchor=east] at (0,4.15) {CS};
+  
+  % SCK - idle low, toggle
+  \draw[thick, ee-blue] (0.5,2.5) -- (1,2.5);
+  \foreach \i in {0,...,7} {
+    \pgfmathsetmacro{\x}{1 + \i*2}
+    \draw[thick, ee-blue] (\x, 2.5) -- (\x, 3.3) -- ({\x+1}, 3.3) -- ({\x+1}, 2.5);
+    \ifthenelse{\i < 8}{
+      \draw[thick, ee-blue] ({\x+1}, 2.5) -- ({\x+2}, 2.5);
+    }{}
+  }
+  \node[anchor=east] at (0,2.9) {SCK};
+  
+  % MOSI data
+  \draw[thick, ee-green!70!black] (0.5,1.5) -- (1,1.5);
+  \foreach \i/\val in {0/1, 1/0, 2/1, 3/1, 4/0, 5/1, 6/0, 7/1} {
+    \pgfmathsetmacro{\x}{1 + \i*2}
+    \pgfmathsetmacro{\y}{0.8 + \val*0.7}
+    \draw[thick, ee-green!70!black] (\x, \y) -- ({\x+2}, \y);
+    \node[above] at ({\x+1}, 1.6) {D\i};
+  }
+  \node[anchor=east] at (0,1.2) {MOSI};
+  
+  % Sample points (rising edge for mode 0)
+  \foreach \i in {0,...,7} {
+    \pgfmathsetmacro{\x}{1.5 + \i*2 - 0.5}
+    \draw[ee-red, -{Stealth}, thin] ({\x+1}, 3.5) -- ({\x+1}, 3.3);
+  }
+  \node[text=ee-red, anchor=west] at (17.5, 3.4) {$\uparrow$ Sample};
+  
+\end{tikzpicture}
+\caption{SPI Mode 0 timing: CPOL=0, CPHA=0. Data sampled on rising clock edge.}
+\label{fig:io:spi}
+\end{figure}
+
+\subsection{I\textsuperscript{2}C (Inter-Integrated Circuit)}
+
+A 2-wire synchronous bus protocol:
+\begin{itemize}[nosep]
+  \item \pin{SCL}: Serial Clock (master drives).
+  \item \pin{SDA}: Serial Data (bidirectional, open-drain with pull-up).
+  \item 7-bit or 10-bit device addressing.
+  \item Speeds: Standard mode (100\,kbps), Fast mode (400\,kbps), Fast mode+ (1\,Mbps).
+\end{itemize}
+
+% TikZ: I2C transaction timing
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.5, every node/.style={font=\scriptsize}]
+  
+  % SCL
+  \draw[thick, ee-blue] (0,3) -- (1,3);
+  \node[anchor=east, font=\small] at (0,3) {SCL};
+  
+  % SDA
+  \draw[thick, ee-green!70!black] (0,0.5) -- (1,0.5);
+  \node[anchor=east, font=\small] at (0,0.5) {SDA};
+  
+  % START condition: SDA falls while SCL is HIGH
+  \draw[thick, ee-green!70!black] (1,1.5) -- (1.5,1.5) -- (2,0.5);
+  \draw[thick, ee-blue] (1,3) -- (2.5,3);
+  \node[above, text=ee-red, font=\small\bfseries] at (1.75, 1.6) {S};
+  
+  % Address bits A6-A0 (7 bits) + R/W bit
+  \foreach \i/\val in {0/1, 1/0, 2/1, 3/0, 4/0, 5/0, 6/0} {
+    \pgfmathsetmacro{\x}{2.5 + \i*1.5}
+    \pgfmathsetmacro{\y}{0.5 + \val*1}
+    % SCL pulse
+    \draw[thick, ee-blue] (\x, 2) -- (\x, 3) -- ({\x+0.75}, 3) -- ({\x+0.75}, 2) -- ({\x+1.5}, 2);
+    % SDA
+    \draw[thick, ee-green!70!black] (\x, \y) -- ({\x+1.5}, \y);
+    \node[above] at ({\x+0.75}, 1.6) {A\pgfmathparse{int(6-\i)}\pgfmathresult};
+  }
+  
+  % R/W bit
+  \pgfmathsetmacro{\rwx}{2.5 + 7*1.5}
+  \draw[thick, ee-blue] (\rwx, 2) -- (\rwx, 3) -- ({\rwx+0.75}, 3) -- ({\rwx+0.75}, 2) -- ({\rwx+1.5}, 2);
+  \draw[thick, ee-amber] (\rwx, 0.5) -- ({\rwx+1.5}, 0.5);
+  \node[above, text=ee-amber] at ({\rwx+0.75}, 1.6) {R/W};
+  
+  % ACK bit (slave drives SDA LOW)
+  \pgfmathsetmacro{\ackx}{\rwx + 1.5}
+  \draw[thick, ee-blue] (\ackx, 2) -- (\ackx, 3) -- ({\ackx+0.75}, 3) -- ({\ackx+0.75}, 2) -- ({\ackx+1.5}, 2);
+  \draw[thick, ee-red] (\ackx, 0.5) -- ({\ackx+1.5}, 0.5);
+  \node[above, text=ee-red, font=\small\bfseries] at ({\ackx+0.75}, 1.6) {ACK};
+  
+  % STOP condition
+  \pgfmathsetmacro{\stopx}{\ackx + 2}
+  \draw[thick, ee-blue] (\stopx, 2) -- (\stopx, 3) -- ({\stopx+1.5}, 3);
+  \draw[thick, ee-green!70!black] (\stopx, 0.5) -- ({\stopx+0.5}, 0.5) -- ({\stopx+1}, 1.5);
+  \node[above, text=ee-red, font=\small\bfseries] at ({\stopx+0.75}, 1.6) {P};
+  
+\end{tikzpicture}
+\caption{I\textsuperscript{2}C transaction: START (S), 7-bit address, R/W bit, ACK from slave, STOP (P).}
+\label{fig:io:i2c}
+\end{figure}
+
+\textbf{Multi-master arbitration:} If two masters start transmitting simultaneously, arbitration is performed bit-by-bit on SDA. A master sending HIGH but reading LOW (another master is driving LOW) loses arbitration and backs off.
+
+\textbf{Clock stretching:} A slave can hold SCL LOW to pause the master while it processes data.
+
+\subsection{Other Buses}
+
+\begin{itemize}
+  \item \textbf{1-Wire (Maxim/Dallas):} Single data wire + ground. Used for temperature sensors (DS18B20), iButtons. Parasitic power from the data line.
+  \item \textbf{CAN (Controller Area Network):} Differential 2-wire bus for automotive and industrial. Multi-master with priority-based arbitration. Up to 1\,Mbps (classic CAN) or 5\,Mbps (CAN FD).
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Code Examples}
+\label{sec:io:code}
+
+\begin{lstlisting}[style=C, caption={STM32 HAL-style SPI transmit.}]
+// Transmit a byte over SPI1 (polling mode)
+void spi_transmit_byte(uint8_t data) {
+    // Wait until TX buffer is empty
+    while (!(SPI1->SR & SPI_SR_TXE))
+        ;
+    // Write data to DR (starts transmission)
+    *(volatile uint8_t *)&SPI1->DR = data;
+    // Wait until transmission complete
+    while (SPI1->SR & SPI_SR_BSY)
+        ;
+}
+
+// Transmit/receive a byte (full duplex)
+uint8_t spi_transfer(uint8_t tx_data) {
+    while (!(SPI1->SR & SPI_SR_TXE))
+        ;
+    *(volatile uint8_t *)&SPI1->DR = tx_data;
+    while (!(SPI1->SR & SPI_SR_RXNE))
+        ;
+    return *(volatile uint8_t *)&SPI1->DR;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=C, caption={Bit-bang I\textsuperscript{2}C master in C (simplified).}]
+#define SDA_HIGH()  GPIOB->BSRR = (1U << 7)
+#define SDA_LOW()   GPIOB->BSRR = (1U << 23)
+#define SCL_HIGH()  GPIOB->BSRR = (1U << 6)
+#define SCL_LOW()   GPIOB->BSRR = (1U << 22)
+#define SDA_READ()  ((GPIOB->IDR >> 7) & 1U)
+
+static void i2c_delay(void) {
+    for (volatile int i = 0; i < 10; i++);  // ~5 us at 72 MHz
+}
+
+void i2c_start(void) {
+    SDA_HIGH(); SCL_HIGH(); i2c_delay();
+    SDA_LOW();  i2c_delay();  // SDA falls while SCL is HIGH
+    SCL_LOW();  i2c_delay();
+}
+
+void i2c_stop(void) {
+    SDA_LOW();  SCL_HIGH(); i2c_delay();
+    SDA_HIGH(); i2c_delay();  // SDA rises while SCL is HIGH
+}
+
+uint8_t i2c_write_byte(uint8_t data) {
+    for (int i = 7; i >= 0; i--) {
+        if (data & (1 << i)) SDA_HIGH();
+        else                 SDA_LOW();
+        i2c_delay();
+        SCL_HIGH(); i2c_delay();
+        SCL_LOW();  i2c_delay();
+    }
+    // Read ACK (slave drives SDA LOW for ACK)
+    SDA_HIGH();  // Release SDA for slave
+    SCL_HIGH(); i2c_delay();
+    uint8_t ack = !SDA_READ();  // ACK = SDA LOW
+    SCL_LOW();  i2c_delay();
+    return ack;
+}
+\end{lstlisting}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:io:examples}
+
+\begin{example}[UART Baud Rate Calculation]
+A UART module derives its baud rate from a \freq{72}{MHz} peripheral clock using a 16$\times$ oversampling divider:
+\[
+  \text{USARTDIV} = \frac{f_{\text{CLK}}}{16 \times \text{Baud}}
+\]
+Calculate the USARTDIV register value for 115200 baud and determine the actual baud rate and percentage error.
+
+\begin{solution}
+\[
+  \text{USARTDIV} = \frac{72{,}000{,}000}{16 \times 115{,}200} = \frac{72{,}000{,}000}{1{,}843{,}200} = 39.0625
+\]
+
+The register stores this as a fixed-point value: integer part = 39, fractional part = $0.0625 \times 16 = 1$.
+
+BRR register value: $(39 \ll 4) | 1 = 625 = \hex{0271}$.
+
+Actual baud rate:
+\[
+  \text{Baud}_{\text{actual}} = \frac{72{,}000{,}000}{16 \times 39.0625} = \frac{72{,}000{,}000}{625} = 115{,}200
+\]
+
+Error: exactly 0\%. In this case, the clock divides perfectly.
+\end{solution}
+\end{example}
+
+\begin{example}[ADC Resolution and Accuracy]
+A 12-bit ADC with $V_{\text{ref}} = 3.3\,$V measures a sensor output. Calculate: (a) the voltage resolution (LSB), (b) the digital output for $V_{\text{in}} = 1.65\,$V, (c) the quantisation error.
+
+\begin{solution}
+(a) Voltage resolution:
+\[
+  \text{LSB} = \frac{V_{\text{ref}}}{2^{12}} = \frac{3.3}{4096} = 0.806\,\text{mV}
+\]
+
+(b) Digital output:
+\[
+  D = \left\lfloor \frac{1.65 \times 4096}{3.3} \right\rfloor = \left\lfloor 2048 \right\rfloor = 2048 = \hex{800}
+\]
+
+(c) Maximum quantisation error is $\pm 0.5\,$LSB $ = \pm 0.403\,$mV.
+\end{solution}
+\end{example}
+
+\begin{example}[SPI Transfer Time]
+An SPI master communicates with a Flash memory at \freq{18}{MHz} clock. To read 4096 bytes, the master sends a 1-byte command + 3-byte address, then reads 4096 bytes. Calculate total transfer time.
+
+\begin{solution}
+Total bytes transferred: $1 + 3 + 4096 = 4100$ bytes $= 32{,}800$ bits.
+
+Time per bit: $1/18\,\text{MHz} = 55.6\,$ns.
+
+Total transfer time: $32{,}800 \times 55.6\,$ns $= 1.823\,$ms.
+
+Effective throughput: $4096 / 1.823\,$ms $= 2.25\,$MB/s. (Overhead from command and address is small.)
+\end{solution}
+\end{example}
+
+\begin{example}[I\textsuperscript{2}C Transaction Length]
+Calculate the time to write 2 data bytes to an I\textsuperscript{2}C slave at 400\,kbps (Fast mode). Include START, address, ACK bits, and STOP.
+
+\begin{solution}
+Bits on the bus:
+\begin{itemize}[nosep]
+  \item START condition: 1 bit period
+  \item Address (7 bits) + R/W (1 bit) = 8 bits
+  \item ACK from slave: 1 bit
+  \item Data byte 1: 8 bits + ACK: 1 bit = 9 bits
+  \item Data byte 2: 8 bits + ACK: 1 bit = 9 bits
+  \item STOP condition: 1 bit period
+\end{itemize}
+Total: $1 + 8 + 1 + 9 + 9 + 1 = 29$ bit periods.
+
+At 400\,kbps: $T = 29 / 400{,}000 = 72.5\,\mu$s.
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:io:practice}
+
+\begin{exercise}[GPIO Configuration]
+On an STM32F4, configure PA0 as analog input for the ADC (no pull-up/pull-down) and PA5 as alternate function push-pull for SPI1\_SCK using direct register writes.
+\end{exercise}
+
+\begin{exercise}[ADC Sampling Design]
+A vibration sensor outputs frequencies up to 5\,kHz. Design the ADC system: sampling rate, anti-aliasing filter cutoff frequency, and ADC resolution needed to achieve 60\,dB SNR.
+\end{exercise}
+
+\begin{exercise}[Protocol Selection]
+For each scenario, choose the most appropriate serial protocol (UART, SPI, I\textsuperscript{2}C, or CAN) and justify:
+\begin{enumerate}[label=(\alph*)]
+  \item Reading a temperature sensor that updates once per second.
+  \item Streaming audio samples at 48\,kHz, 16-bit stereo.
+  \item Networking 20 sensor nodes in a factory over 100\,m total cable length.
+  \item High-speed communication with an external SPI Flash memory.
+\end{enumerate}
+\end{exercise}
+
+\begin{exercise}[SPI Timing Analysis]
+Draw the complete SPI Mode 2 (CPOL=1, CPHA=0) timing diagram for transmitting the byte \hex{A5} (MSB first): show SCK, MOSI, MISO (assume slave returns \hex{3C}), and CS waveforms.
+\end{exercise}
+
+\begin{exercise}[DMA vs.\ Interrupt Comparison]
+An application receives UART data at 921600 baud (8N1). Calculate the interrupt rate and CPU overhead with interrupt-driven reception. Then propose a DMA-based alternative and estimate the reduction in CPU load.
+\end{exercise}
+
+\begin{exercise}[PWM Motor Control]
+A DC motor requires PWM at 20\,kHz with 0.1\% duty cycle resolution. The timer clock is 168\,MHz. Calculate the required timer prescaler and auto-reload register values.
+\end{exercise}

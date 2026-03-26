@@ -1,0 +1,324 @@
+% !TeX root = main.tex
+% ============================================================================
+% EE322: Embedded Systems Design — Shared Preamble
+% Department of Electrical & Electronic Engineering
+% University of Peradeniya, Sri Lanka
+% ============================================================================
+
+% --- Page Geometry ---
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm]{geometry}
+
+% --- Encoding and Fonts ---
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Mathematics ---
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+% --- Graphics and Figures ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{subcaption}
+
+% --- TikZ and Plotting ---
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, automata, matrix, calc, decorations.markings, patterns, fit, backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% --- Colors ---
+\usepackage[dvipsnames,svgnames,x11names]{xcolor}
+
+\definecolor{ee-dark}{HTML}{0D1117}
+\definecolor{ee-green}{HTML}{00FF9C}
+\definecolor{ee-blue}{HTML}{00BFFF}
+\definecolor{ee-amber}{HTML}{FFB300}
+\definecolor{ee-red}{HTML}{FF4C4C}
+\definecolor{ee-gray}{HTML}{8B949E}
+\definecolor{ee-lightbg}{HTML}{F0F4F8}
+\definecolor{ee-darkbg}{HTML}{1A1F26}
+
+% --- Code Listings ---
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{ee-blue}\bfseries,
+  commentstyle=\color{ee-gray}\itshape,
+  stringstyle=\color{ee-green},
+  numberstyle=\tiny\color{ee-gray},
+  numbers=left,
+  frame=single,
+  breaklines=true,
+  backgroundcolor=\color{ee-dark},
+  rulecolor=\color{ee-gray},
+  tabsize=4,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=1.5em,
+  framexleftmargin=1em,
+  columns=flexible,
+  literate={*}{{\char42}}1
+}
+
+\lstdefinestyle{C}{language=C, morekeywords={uint8_t,uint16_t,uint32_t,int8_t,int16_t,int32_t,volatile,inline,bool,size_t}}
+\lstdefinestyle{ARM}{language=[ARM]Assembler, morekeywords={LDR,STR,MOV,ADD,SUB,CMP,BNE,BEQ,BL,BX,PUSH,POP,LDM,STM,MUL,AND,ORR,EOR,LSL,LSR,ASR,NOP,SVC,MRS,MSR,IT,CBZ,CBNZ}}
+\lstdefinestyle{Python}{language=Python, morekeywords={def,class,import,from,as,with,yield,async,await}}
+
+% --- Colored Boxes (tcolorbox) ---
+\usepackage[most,skins,breakable]{tcolorbox}
+
+% Definition environment - blue left bar
+\newtcolorbox[auto counter, number within=chapter]{definition}[1][]{%
+  enhanced,
+  breakable,
+  colback=ee-blue!5!white,
+  colframe=ee-blue!70!black,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={Definition~\thetcbcounter\ifstrempty{#1}{}{:\ #1}},
+  left=4pt,
+  borderline west={3pt}{0pt}{ee-blue},
+  sharp corners,
+  boxrule=0.5pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% Theorem environment - green left bar
+\newtcolorbox[auto counter, number within=chapter]{theorem}[1][]{%
+  enhanced,
+  breakable,
+  colback=ee-green!5!white,
+  colframe=ee-green!50!black,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={Theorem~\thetcbcounter\ifstrempty{#1}{}{:\ #1}},
+  left=4pt,
+  borderline west={3pt}{0pt}{ee-green!70!black},
+  sharp corners,
+  boxrule=0.5pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% Example environment - amber left bar, light background
+\newtcolorbox[auto counter, number within=chapter]{example}[1][]{%
+  enhanced,
+  breakable,
+  colback=ee-amber!8!white,
+  colframe=ee-amber!60!black,
+  coltitle=black,
+  fonttitle=\bfseries,
+  title={Example~\thetcbcounter\ifstrempty{#1}{}{:\ #1}},
+  left=4pt,
+  borderline west={3pt}{0pt}{ee-amber},
+  sharp corners,
+  boxrule=0.5pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% Important environment - red left bar, key point
+\newtcolorbox{important}[1][]{%
+  enhanced,
+  breakable,
+  colback=ee-red!8!white,
+  colframe=ee-red!60!black,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={\textcolor{ee-red}{$\boldsymbol{\triangle}$}\ Key Point\ifstrempty{#1}{}{:\ #1}},
+  left=4pt,
+  borderline west={3pt}{0pt}{ee-red},
+  sharp corners,
+  boxrule=0.5pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% Code block environment - dark background, monospaced
+\newtcolorbox{code_block}[2][C]{%
+  enhanced,
+  breakable,
+  colback=ee-dark,
+  colframe=ee-gray!50!black,
+  coltitle=ee-green,
+  fonttitle=\ttfamily\bfseries,
+  title={#2},
+  sharp corners,
+  boxrule=0.5pt,
+  top=4pt, bottom=4pt,
+  before skip=10pt, after skip=10pt,
+  left=4pt, right=4pt
+}
+
+% Insight environment - dashed border, italic
+\newtcolorbox{insight}[1][]{%
+  enhanced,
+  breakable,
+  colback=white,
+  colframe=ee-gray!40!white,
+  fontupper=\itshape,
+  borderline={1pt}{0pt}{ee-gray!50!white, dashed},
+  title={\textcolor{ee-blue}{$\diamond$}\ Insight\ifstrempty{#1}{}{:\ #1}},
+  fonttitle=\bfseries\itshape,
+  coltitle=ee-blue!70!black,
+  sharp corners,
+  boxrule=0pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% Practical Note environment - gray, lab/real-world
+\newtcolorbox{practicalNote}[1][]{%
+  enhanced,
+  breakable,
+  colback=ee-gray!8!white,
+  colframe=ee-gray!40!black,
+  coltitle=black,
+  fonttitle=\bfseries,
+  title={\textcolor{ee-gray}{$\blacktriangleright$}\ Practical Note\ifstrempty{#1}{}{:\ #1}},
+  left=4pt,
+  borderline west={3pt}{0pt}{ee-gray},
+  sharp corners,
+  boxrule=0.5pt,
+  top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt
+}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+% --- Lists ---
+\usepackage{enumitem}
+
+% --- Framed Environments ---
+\usepackage{mdframed}
+
+% --- Algorithms ---
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+% --- Hyperlinks ---
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=ee-blue!80!black,
+  citecolor=ee-green!70!black,
+  urlcolor=ee-amber!80!black,
+  bookmarksnumbered=true,
+  bookmarksopen=true,
+  pdfstartview=FitH
+}
+
+% --- Smart Cross-References (must be loaded after hyperref) ---
+\usepackage{cleveref}
+
+% --- Bibliography ---
+\usepackage[backend=biber, style=ieee, sorting=nyt, maxbibnames=6]{biblatex}
+\addbibresource{bibliography.bib}
+
+% --- Headers and Footers ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\textsc{EE322 --- Embedded Systems Design}}
+\fancyfoot[C]{\thepage}
+\fancyfoot[R]{\footnotesize Department of EEE, University of Peradeniya}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% Also apply to plain style (chapter opening pages)
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyfoot[C]{\thepage}
+  \fancyfoot[R]{\footnotesize Department of EEE, University of Peradeniya}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0.2pt}
+}
+
+% ============================================================================
+% Custom Macros
+% ============================================================================
+
+% Register name formatting - monospace bold amber
+\newcommand{\reg}[1]{\texttt{\textbf{\textcolor{ee-amber}{#1}}}}
+
+% Pin name formatting - monospace cyan
+\newcommand{\pin}[1]{\texttt{\textcolor{ee-blue}{#1}}}
+
+% Frequency formatting
+\newcommand{\freq}[2]{#1\,\text{#2}}
+
+% Binary number formatting - monospace
+\newcommand{\binary}[1]{\texttt{#1\textsubscript{2}}}
+
+% Hex number formatting
+\newcommand{\hex}[1]{\texttt{0x#1}}
+
+% Reference wrappers
+\newcommand{\figref}[1]{\cref{#1}}
+\newcommand{\tabref}[1]{\cref{#1}}
+
+% Bus notation
+\newcommand{\bus}[1]{\texttt{#1}}
+
+% Instruction formatting
+\newcommand{\instr}[1]{\texttt{\textbf{#1}}}
+
+% Module info box (used at start of each chapter)
+\newtcolorbox{moduleinfo}{%
+  enhanced,
+  colback=ee-blue!3!white,
+  colframe=ee-blue!50!black,
+  sharp corners,
+  boxrule=0.8pt,
+  left=8pt, right=8pt,
+  top=8pt, bottom=8pt,
+  before skip=15pt, after skip=15pt,
+  fontupper=\small
+}
+
+% Question/Exercise environment
+\newcounter{exercise}[chapter]
+\renewcommand{\theexercise}{\thechapter.\arabic{exercise}}
+\newenvironment{exercise}[1][]{%
+  \refstepcounter{exercise}%
+  \begin{tcolorbox}[
+    enhanced,
+    breakable,
+    colback=white,
+    colframe=ee-gray!30!white,
+    coltitle=black,
+    fonttitle=\bfseries,
+    title={Exercise~\theexercise\ifstrempty{#1}{}{:\ #1}},
+    sharp corners,
+    boxrule=0.5pt,
+    top=4pt, bottom=4pt,
+    before skip=8pt, after skip=8pt
+  ]
+}{%
+  \end{tcolorbox}
+}
+
+% Solution environment (collapsible in PDF via ocgx2 if desired)
+\newtcolorbox{solution}{%
+  enhanced,
+  breakable,
+  colback=ee-green!3!white,
+  colframe=ee-green!40!black,
+  coltitle=ee-green!70!black,
+  fonttitle=\bfseries,
+  title={Solution},
+  sharp corners,
+  boxrule=0.5pt,
+  top=4pt, bottom=4pt,
+  before skip=6pt, after skip=8pt
+}

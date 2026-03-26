@@ -1,0 +1,70 @@
+% !TeX root = main.tex
+% ============================================================================
+% MAIN DOCUMENT: EE322 — Embedded Systems Design
+% University of Peradeniya, Department of Electrical and Electronic Engineering
+% ============================================================================
+
+\documentclass[12pt,oneside]{book}
+\input{preamble}
+
+\begin{document}
+
+% ---- Title Page ----
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\Huge\bfseries\color{ee-blue} EE 322\\[0.3cm] Embedded Systems Design}
+
+\vspace{1cm}
+
+{\LARGE Lecture Notes}
+
+\vspace{2cm}
+
+{\Large Department of Electrical and Electronic Engineering\\
+Faculty of Engineering\\
+University of Peradeniya, Sri Lanka}
+
+\vspace{2cm}
+
+{\large 3 Credits \quad|\quad 27 Lecture Hours \quad|\quad 9 Modules}
+
+\vspace{3cm}
+
+{\normalsize Academic Year 2024/2025}
+
+\vspace{\fill}
+
+{\small\color{ee-gray}
+These notes are prepared as a comprehensive reference for the EE322 course.\\
+They cover all nine modules of the syllabus from introduction to modeling.}
+
+\end{titlepage}
+
+% ---- Front Matter ----
+\frontmatter
+\tableofcontents
+\listoffigures
+\listoftables
+% \lstlistoflistings  % Uncomment for code listing index
+
+% ---- Main Matter ----
+\mainmatter
+
+\input{module01_intro/module01}
+\input{module02_architecture/module02}
+\input{module03_processors/module03}
+\input{module04_memory/module04}
+\input{module05_io/module05}
+\input{module06_multitasking/module06}
+\input{module07_scheduling/module07}
+\input{module08_analysis/module08}
+\input{module09_modeling/module09}
+
+% ---- Back Matter ----
+\backmatter
+
+\printbibliography[heading=bibintoc, title={References}]
+
+\end{document}

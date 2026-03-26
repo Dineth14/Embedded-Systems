@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M04 — Memory Architectures | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html" class="active">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#technologies">Memory Technologies</a></li>
+        <li><a href="#hierarchy">Memory Hierarchy</a></li>
+        <li><a href="#cache">Cache Operation</a></li>
+        <li><a href="#dma">DMA Transfers</a></li>
+        <li><a href="#sim-memory">Memory Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 04 — 2 Lecture Hours</div>
+        <h1 class="module-header__title">Memory Architectures</h1>
+      </div>
+
+      <section id="technologies" class="reveal">
+        <h2>Memory Technologies</h2>
+        <table>
+          <thead><tr><th>Type</th><th>Volatile?</th><th>Speed</th><th>Density</th><th>Endurance</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td>SRAM</td><td>Yes</td><td>~1 ns</td><td>Low</td><td>Unlimited</td><td>Cache, registers, TCM</td></tr>
+            <tr><td>DRAM</td><td>Yes</td><td>~10 ns</td><td>High</td><td>Unlimited</td><td>Main memory (Cortex-A)</td></tr>
+            <tr><td>NOR Flash</td><td>No</td><td>~70 ns (read)</td><td>Medium</td><td>100K cycles</td><td>Code storage (XIP)</td></tr>
+            <tr><td>NAND Flash</td><td>No</td><td>~25 μs (page)</td><td>Very High</td><td>10K–100K</td><td>Mass storage</td></tr>
+            <tr><td>EEPROM</td><td>No</td><td>~5 ms (write)</td><td>Low</td><td>1M cycles</td><td>Configuration, calibration</td></tr>
+            <tr><td>MRAM</td><td>No</td><td>~10 ns</td><td>Medium</td><td>10¹⁵ cycles</td><td>Non-volatile SRAM replacement</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="hierarchy" class="reveal">
+        <h2>Memory Hierarchy</h2>
+        <div class="theory-panel theory-panel--theorem">
+          <div class="theory-panel__label">Principle</div>
+          <p>The memory hierarchy exploits <strong>temporal locality</strong> (recently accessed data is likely to be accessed again) and <strong>spatial locality</strong> (nearby data is likely to be accessed soon). Faster, smaller memories are placed closer to the CPU.</p>
+          <p><strong>Average Memory Access Time (AMAT):</strong></p>
+          <p>$$\text{AMAT} = t_{\text{hit}} + \text{miss rate} \times t_{\text{miss penalty}}$$</p>
+        </div>
+      </section>
+
+      <section id="cache" class="reveal">
+        <h2>Cache Operation</h2>
+        <h3>Direct-Mapped Cache</h3>
+        <p>Each memory block maps to exactly one cache line: <code>line = (address / block_size) % num_lines</code>.</p>
+        <p>Simple but prone to <strong>conflict misses</strong> when two frequently-used addresses map to the same line.</p>
+
+        <h3>N-Way Set-Associative Cache</h3>
+        <p>Each memory block maps to a <strong>set</strong> with $N$ ways. The address is checked against all $N$ tags in the set. Reduces conflict misses at the cost of more comparators.</p>
+
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Example</div>
+          <p>A 4 KB, 4-way set-associative cache with 16-byte lines on a 32-bit system:</p>
+          <ul>
+            <li>Total lines: $4096 / 16 = 256$</li>
+            <li>Sets: $256 / 4 = 64$</li>
+            <li>Offset bits: $\log_2(16) = 4$</li>
+            <li>Index bits: $\log_2(64) = 6$</li>
+            <li>Tag bits: $32 - 6 - 4 = 22$</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="dma" class="reveal">
+        <h2>DMA Transfers</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p><strong>Direct Memory Access (DMA)</strong> allows peripherals to transfer data to/from memory without CPU intervention. The CPU programs the DMA controller (source, destination, count, direction) and is free to execute other tasks until the DMA completion interrupt.</p>
+        </div>
+        <p>DMA modes: memory-to-peripheral, peripheral-to-memory, memory-to-memory. On STM32, each DMA stream can be configured for circular (continuous) or normal (one-shot) mode.</p>
+      </section>
+
+      <!-- Memory Hierarchy Simulation -->
+      <section id="sim-memory" class="reveal">
+        <h2>Interactive: Memory Hierarchy Simulation</h2>
+        <div id="memory-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">Cache Hit/Miss Visualizer</div>
+            <div class="sim-container__controls">
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="sim-container__canvas" id="memory-canvas"></div>
+          <div class="control-group" style="padding: 0.75rem 1.25rem;">
+            <label>Cache Lines</label>
+            <input type="range" min="4" max="16" step="1" value="8" data-control="cache-lines">
+            <span class="value-display cache-lines-display">8</span>
+          </div>
+          <div class="stat-display" id="memory-stats">
+            <div class="stat-item"><div class="stat-item__value" id="mem-accesses">0</div><div class="stat-item__label">Accesses</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mem-hits">0</div><div class="stat-item__label">Hits</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mem-misses">0</div><div class="stat-item__label">Misses</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="mem-hitrate">-</div><div class="stat-item__label">Hit Rate</div></div>
+          </div>
+          <div class="sim-log" id="memory-log"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_memory_hierarchy.js"></script>
+</body>
+</html>

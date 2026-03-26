@@ -1,0 +1,419 @@
+% !TeX root = ../main.tex
+% ============================================================================
+% MODULE 4: Memory Architectures
+% EE322 — Embedded Systems Design
+% ============================================================================
+
+\chapter{Memory Architectures}
+\label{ch:memory}
+\chaptermark{Module 4}
+
+\begin{moduleinfo}
+  \textbf{Module:} 4 \quad
+  \textbf{Lecture Hours:} 2 \quad
+  \textbf{ILOs Addressed:} ILO-2, ILO-3 \\[4pt]
+  \textbf{Learning Outcomes:} By the end of this module, students will be able to:
+  \begin{enumerate}[nosep]
+    \item Describe SRAM, DRAM, Flash, and emerging memory technologies.
+    \item Explain the memory hierarchy and cache operation.
+    \item Interpret the memory map of an embedded processor.
+    \item Analyse cache performance using hit/miss rates and latency models.
+  \end{enumerate}
+\end{moduleinfo}
+
+% ----------------------------------------------------------------------------
+\section{Memory Technologies}
+\label{sec:mem:tech}
+
+\subsection{SRAM (Static Random-Access Memory)}
+
+\begin{definition}[SRAM]
+Static RAM stores each bit in a bistable latch (flip-flop) constructed from six transistors (6T cell). Data is retained as long as power is supplied—no refresh is needed.
+\end{definition}
+
+% TikZ: 6T SRAM cell
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.85, every node/.style={font=\small}]
+  % Inverters
+  \draw[thick] (0,0) rectangle (1,1.2);
+  \node at (0.5,0.6) {INV};
+  \draw[thick] (3,0) rectangle (4,1.2);
+  \node at (3.5,0.6) {INV};
+  
+  % Cross-coupling
+  \draw[thick, -{Stealth}] (1,0.8) -- (3,0.4);
+  \draw[thick, -{Stealth}] (3,0.8) -- (1,0.4);
+  
+  % Internal nodes Q and Q-bar
+  \node[above] at (1,0.8) {Q};
+  \node[above] at (3,0.8) {$\overline{\text{Q}}$};
+  
+  % Access transistors
+  \draw[thick] (-1.5,0.6) -- (0,0.6);
+  \node[draw, thick, minimum width=0.8cm, minimum height=0.4cm] (m1) at (-0.75,0.6) {M5};
+  \draw[thick] (4,0.6) -- (5.5,0.6);
+  \node[draw, thick, minimum width=0.8cm, minimum height=0.4cm] (m2) at (4.75,0.6) {M6};
+  
+  % Bit lines
+  \draw[thick] (-1.5,0.6) -- (-1.5,2);
+  \node[above] at (-1.5,2) {BL};
+  \draw[thick] (5.5,0.6) -- (5.5,2);
+  \node[above] at (5.5,2) {$\overline{\text{BL}}$};
+  
+  % Word line
+  \draw[thick, ee-red] (-0.75,1.5) -- (4.75,1.5);
+  \draw[thick, ee-red] (-0.75,1) -- (-0.75,1.5);
+  \draw[thick, ee-red] (4.75,1) -- (4.75,1.5);
+  \node[above, text=ee-red] at (2,1.5) {WL (Word Line)};
+  
+  % VDD and GND
+  \draw[thick] (0.5,1.2) -- (0.5,1.8);
+  \node[above] at (0.5,1.8) {V$_{DD}$};
+  \draw[thick] (3.5,1.2) -- (3.5,1.8);
+  \draw[thick] (0.5,0) -- (0.5,-0.3);
+  \node[below] at (0.5,-0.3) {GND};
+  \draw[thick] (3.5,0) -- (3.5,-0.3);
+  \node[below] at (3.5,-0.3) {GND};
+  
+\end{tikzpicture}
+\caption{Simplified 6T SRAM cell: two cross-coupled inverters with two access transistors controlled by the word line.}
+\label{fig:mem:sram6t}
+\end{figure}
+
+Properties: fast access (1--10\,ns), low density (6 transistors per bit), relatively high power (leakage currents), used for CPU registers, cache memory, and MCU on-chip SRAM.
+
+\subsection{DRAM (Dynamic Random-Access Memory)}
+
+DRAM stores each bit as a charge on a tiny capacitor (1T1C cell). The charge leaks over time, so DRAM requires periodic \emph{refresh} (every 64\,ms typically). DRAM is denser (1 transistor + 1 capacitor per bit) and cheaper per bit than SRAM but slower (50--100\,ns latency). Used as main memory in application processors. Rarely used on-chip in MCUs due to refresh complexity.
+
+\subsection{Flash Memory}
+
+\begin{itemize}
+  \item \textbf{NOR Flash:} Byte-addressable reads (random access), supporting execute-in-place (XIP). Used for code storage in MCUs. Read: 10--100\,ns, erase: 0.5--1\,s per sector.
+  \item \textbf{NAND Flash:} Page-oriented reads (512B--8KB pages), higher density and lower cost. Used for data storage (SD cards, eMMC, SSDs). Requires a Flash Translation Layer (FTL) for wear leveling.
+  \item \textbf{Endurance:} NOR: 10{,}000--100{,}000 erase cycles. NAND: 1{,}000--100{,}000 cycles (depends on technology node).
+  \item \textbf{Write mechanism:} Electrons are tunneled through oxide onto a floating gate (programming). Erasing removes electrons via Fowler-Nordheim tunneling for an entire block.
+\end{itemize}
+
+\subsection{EEPROM}
+
+Electrically Erasable Programmable ROM: byte-addressable writes (unlike Flash which erases in blocks). Low endurance (100{,}000--1M cycles). Used for storing configuration parameters (e.g., calibration data, MAC addresses).
+
+\subsection{ROM Variants}
+
+\begin{itemize}
+  \item \textbf{Mask ROM:} Programmed at fabrication. Zero cost per-unit for large volumes, but inflexible.
+  \item \textbf{OTP (One-Time Programmable):} Fuse-based, programmed once after fabrication.
+\end{itemize}
+
+\subsection{Emerging Non-Volatile Memories}
+
+\begin{itemize}
+  \item \textbf{MRAM (Magnetoresistive RAM):} Uses magnetic tunnel junctions. Fast ($\sim$10\,ns), high endurance ($>10^{12}$ cycles), non-volatile. Increasingly used in safety-critical MCUs.
+  \item \textbf{FeRAM (Ferroelectric RAM):} Based on ferroelectric capacitors. Low power, fast writes, but limited density. Used in TI MSP430FR series (FRAM-based MCU).
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Memory technology comparison.}
+\label{tab:mem:techcomp}
+\begin{tabularx}{\textwidth}{l c c c c c c}
+\toprule
+\textbf{Technology} & \textbf{Speed} & \textbf{Density} & \textbf{Power} & \textbf{Cost/bit} & \textbf{Volatile?} & \textbf{Endurance} \\
+\midrule
+SRAM & 1--10\,ns & Low & Medium & High & Yes & $\infty$ \\
+DRAM & 50--100\,ns & High & Medium & Low & Yes & $\infty$ \\
+NOR Flash & 100\,ns & Medium & Low & Medium & No & 100K cycles \\
+NAND Flash & 25\,$\mu$s & Very High & Low & Very Low & No & 10K cycles \\
+EEPROM & 200\,ns & Low & Low & High & No & 1M cycles \\
+MRAM & 10\,ns & Medium & Low & High & No & $>10^{12}$ \\
+FeRAM & 50\,ns & Medium & V. Low & Medium & No & $>10^{12}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ----------------------------------------------------------------------------
+\section{Memory Hierarchy}
+\label{sec:mem:hierarchy}
+
+The memory hierarchy exploits the principle that \emph{faster memory is more expensive}, creating a pyramid-shaped structure.
+
+% TikZ: cache hierarchy pyramid
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.95]
+  % Pyramid layers (bottom to top)
+  \fill[ee-gray!15] (-5,0) -- (5,0) -- (4,1.2) -- (-4,1.2) -- cycle;
+  \draw[thick] (-5,0) -- (5,0) -- (4,1.2) -- (-4,1.2) -- cycle;
+  \node at (0,0.6) {\textbf{Secondary Storage} (Flash/SD): 100\,$\mu$s, GB, \$0.001/KB};
+  
+  \fill[ee-blue!10] (-4,1.2) -- (4,1.2) -- (3,2.4) -- (-3,2.4) -- cycle;
+  \draw[thick] (-4,1.2) -- (4,1.2) -- (3,2.4) -- (-3,2.4) -- cycle;
+  \node at (0,1.8) {\textbf{Main Memory} (SRAM/DRAM): 10--100\,ns, KB--MB};
+  
+  \fill[ee-amber!10] (-3,2.4) -- (3,2.4) -- (2,3.6) -- (-2,3.6) -- cycle;
+  \draw[thick] (-3,2.4) -- (3,2.4) -- (2,3.6) -- (-2,3.6) -- cycle;
+  \node at (0,3.0) {\textbf{L2 Cache}: 5--10\,ns, 64--256\,KB};
+  
+  \fill[ee-green!10] (-2,3.6) -- (2,3.6) -- (1.2,4.6) -- (-1.2,4.6) -- cycle;
+  \draw[thick] (-2,3.6) -- (2,3.6) -- (1.2,4.6) -- (-1.2,4.6) -- cycle;
+  \node at (0,4.1) {\textbf{L1 Cache}: 1--3\,ns, 4--64\,KB};
+  
+  \fill[ee-red!10] (-1.2,4.6) -- (1.2,4.6) -- (0.5,5.4) -- (-0.5,5.4) -- cycle;
+  \draw[thick] (-1.2,4.6) -- (1.2,4.6) -- (0.5,5.4) -- (-0.5,5.4) -- cycle;
+  \node at (0,5.0) {\textbf{Registers}: 0\,ns};
+  
+  % Labels on sides
+  \draw[{Stealth}-{Stealth}, thick, ee-blue] (-5.5,0) -- (-5.5,5.4);
+  \node[rotate=90, text=ee-blue] at (-6.2,2.7) {Speed $\uparrow$ \quad Cost/bit $\uparrow$};
+  
+  \draw[{Stealth}-{Stealth}, thick, ee-red] (5.5,0) -- (5.5,5.4);
+  \node[rotate=270, text=ee-red] at (6.2,2.7) {Capacity $\uparrow$};
+  
+\end{tikzpicture}
+\caption{Memory hierarchy pyramid: speed and cost increase towards the top; capacity increases towards the bottom.}
+\label{fig:mem:pyramid}
+\end{figure}
+
+\subsection{Locality of Reference}
+
+The memory hierarchy works because programs exhibit \emph{locality}:
+\begin{itemize}
+  \item \textbf{Temporal locality:} Recently accessed data is likely to be accessed again soon (e.g., loop variables).
+  \item \textbf{Spatial locality:} Data near recently accessed data is likely to be accessed soon (e.g., array traversal).
+\end{itemize}
+
+\subsection{Cache Operation}
+
+A cache is a small, fast memory that stores copies of frequently accessed main memory locations.
+
+\begin{definition}[Cache Line]
+The fundamental unit of data transfer between cache and main memory. A typical cache line is 32 or 64 bytes. When a cache miss occurs, the entire cache line containing the requested address is fetched.
+\end{definition}
+
+\textbf{Cache associativity} determines where a given memory block can be placed in the cache:
+
+\begin{itemize}
+  \item \textbf{Direct-mapped:} Each memory block maps to exactly one cache line (determined by address bits). Fast lookup but susceptible to conflict misses.
+  \item \textbf{$N$-way set-associative:} Each block can map to any of $N$ lines within a set. The cache is divided into sets of $N$ ways. Reduces conflict misses at the cost of more comparators.
+  \item \textbf{Fully associative:} A block can be placed in any cache line. Eliminates conflict misses but requires searching all lines (expensive for large caches).
+\end{itemize}
+
+\begin{important}[Cache Performance]
+Average memory access time:
+\[
+  T_{\text{avg}} = T_{\text{hit}} + (1 - h) \times T_{\text{miss penalty}}
+\]
+where $h$ is the hit rate and $T_{\text{hit}}$ is the cache access latency (typically 1 cycle for L1).
+\end{important}
+
+\subsection{Cache Coherency in Multicore Systems}
+
+In multicore embedded systems (e.g., dual-core STM32H7), if both cores cache the same data, a write by one core may leave the other core's cache stale. Solutions:
+\begin{itemize}
+  \item \textbf{Write-through:} Writes go to both cache and main memory. Simple but high bus traffic.
+  \item \textbf{Write-back with snooping:} Write only to cache; snoop bus traffic to detect when another core writes to a shared line.
+  \item \textbf{Software cache management:} Explicitly invalidate or clean cache lines before sharing data (common in Cortex-M7 with DMA).
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Memory Models and Mapping}
+\label{sec:mem:mapping}
+
+\subsection{Physical vs.\ Virtual Memory}
+
+\begin{itemize}
+  \item \textbf{Physical address space:} The actual hardware addresses. What appears on the address bus. Cortex-M processors use only physical addresses (no MMU).
+  \item \textbf{Virtual address space:} An abstraction provided by the MMU (on Cortex-A class). Programs use virtual addresses; the MMU translates them to physical addresses via page tables. Enables process isolation, demand paging, and memory protection.
+\end{itemize}
+
+\subsection{Memory-Mapped I/O}
+
+In ARM (and most embedded architectures), peripheral registers are accessed at specific addresses in the memory map, just like SRAM. This means the same \instr{LDR}/\instr{STR} instructions access both memory and peripherals.
+
+% TikZ: STM32 memory map
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    block/.style={draw, thick, minimum width=7cm, align=center, font=\small},
+    label/.style={font=\scriptsize\ttfamily, anchor=east}
+  ]
+  
+  \def\yoff{0}
+  
+  % Flash
+  \node[block, minimum height=1.5cm, fill=ee-green!10] (flash) at (0,0) {\textbf{Flash Memory}\\512\,KB Code Storage + ISR Vector Table};
+  \node[label] at (-3.8, 0.75) {\hex{0800\_0000}};
+  \node[label] at (-3.8, -0.75) {\hex{0807\_FFFF}};
+  
+  % System memory
+  \node[block, minimum height=0.6cm, fill=ee-gray!10, anchor=north] (sysmem) at (0,-0.75) {\scriptsize System Memory (Bootloader ROM)};
+  \node[label] at (-3.8, -1.05) {};
+  
+  % SRAM
+  \node[block, minimum height=1.2cm, fill=ee-blue!10, anchor=north] (sram) at (0, -1.35) {\textbf{SRAM}\\128\,KB Data, Stack, Heap};
+  \node[label] at (-3.8, -1.35) {\hex{2000\_0000}};
+  \node[label] at (-3.8, -2.55) {\hex{2001\_FFFF}};
+  
+  % Peripherals APB1
+  \node[block, minimum height=0.8cm, fill=ee-amber!10, anchor=north] (apb1) at (0, -2.95) {\textbf{APB1 Peripherals}: TIM2--7, USART2--5, SPI2/3, I2C1--3};
+  \node[label] at (-3.8, -2.95) {\hex{4000\_0000}};
+  
+  % Peripherals APB2
+  \node[block, minimum height=0.8cm, fill=ee-amber!15, anchor=north] (apb2) at (0, -3.75) {\textbf{APB2 Peripherals}: TIM1/8, USART1/6, SPI1, ADC1--3};
+  \node[label] at (-3.8, -3.75) {\hex{4001\_0000}};
+  
+  % AHB1
+  \node[block, minimum height=0.8cm, fill=ee-amber!20, anchor=north] (ahb1) at (0, -4.55) {\textbf{AHB1 Peripherals}: GPIOA--I, DMA1/2, RCC, Flash IF};
+  \node[label] at (-3.8, -4.55) {\hex{4002\_0000}};
+  
+  % Cortex-M internal
+  \node[block, minimum height=0.8cm, fill=ee-red!10, anchor=north] (cortex) at (0, -5.35) {\textbf{Cortex-M Internal}: NVIC, SCB, SysTick, MPU, FPU, DWT};
+  \node[label] at (-3.8, -5.35) {\hex{E000\_0000}};
+  \node[label] at (-3.8, -6.15) {\hex{E00F\_FFFF}};
+  
+\end{tikzpicture}
+\caption{STM32F407 memory map showing Flash, SRAM, peripheral, and Cortex-M system address regions.}
+\label{fig:mem:stm32map}
+\end{figure}
+
+\subsection{DMA (Direct Memory Access)}
+
+DMA controllers transfer data between memory regions or between peripherals and memory without CPU intervention. The CPU programs the DMA with source address, destination address, transfer count, and transfer width, then is free to perform other work. An interrupt signals DMA completion.
+
+\textbf{Transfer types:}
+\begin{itemize}[nosep]
+  \item \textbf{Memory-to-memory:} Fast block copy (e.g., framebuffer update).
+  \item \textbf{Peripheral-to-memory:} ADC samples $\to$ buffer, UART receive $\to$ buffer.
+  \item \textbf{Memory-to-peripheral:} Buffer $\to$ DAC, buffer $\to$ SPI transmit.
+\end{itemize}
+
+\begin{practicalNote}[DMA and Cache Coherency]
+On Cortex-M7 with D-cache enabled, DMA writes to SRAM are not visible to the CPU until the cache is invalidated. Before reading DMA-written data, call \texttt{SCB\_InvalidateDCache\_by\_Addr()}. Before DMA reads from SRAM the CPU just wrote, call \texttt{SCB\_CleanDCache\_by\_Addr()}.
+\end{practicalNote}
+
+\begin{lstlisting}[style=C, caption={Accessing memory-mapped registers: direct pointer vs. struct overlay.}]
+// Method 1: Direct pointer (verbose, error-prone)
+#define RCC_AHB1ENR  (*(volatile uint32_t *)0x40023830UL)
+RCC_AHB1ENR |= (1U << 0);  // Enable GPIOA clock
+
+// Method 2: Struct overlay (clean, maintainable)
+typedef struct {
+    volatile uint32_t CR;           // 0x00
+    volatile uint32_t PLLCFGR;      // 0x04
+    volatile uint32_t CFGR;         // 0x08
+    volatile uint32_t CIR;          // 0x0C
+    /* ... more registers ... */
+    volatile uint32_t AHB1ENR;      // 0x30
+} RCC_TypeDef;
+
+#define RCC ((RCC_TypeDef *)0x40023800UL)
+
+// Enable GPIOA and GPIOB clocks
+RCC->AHB1ENR |= (1U << 0) | (1U << 1);
+\end{lstlisting}
+
+% ----------------------------------------------------------------------------
+\section{Worked Examples}
+\label{sec:mem:examples}
+
+\begin{example}[Cache Hit Rate Calculation]
+A Cortex-M7 with a 16\,KB direct-mapped L1 data cache (32-byte lines) executes a program that sequentially reads a 64\,KB array of 32-bit integers. What is the L1 hit rate assuming the cache is initially empty?
+
+\begin{solution}
+Cache parameters:
+\begin{itemize}[nosep]
+  \item Cache size = 16\,KB = 16{,}384 bytes
+  \item Line size = 32 bytes $\Rightarrow$ 8 words (32-bit) per line
+  \item Number of cache lines = $16{,}384 / 32 = 512$
+\end{itemize}
+
+Array access: 64\,KB / 4 bytes = 16{,}384 reads, sequential.
+
+For each cache line fetched, the first access (1 word) is a \textbf{compulsory miss}, and the next 7 words hit in the cache (spatial locality).
+
+After reading 16\,KB ($= $ cache size), the 17th KB starts evicting the 1st KB's cache lines (direct-mapped conflict). However, since we access sequentially and never revisit, there are no conflict misses---only compulsory misses.
+
+Compulsory misses = total lines accessed = $64{,}000 / 32 = 2{,}048$.
+Total accesses = 16{,}384.
+
+Hit rate:
+\[
+  h = 1 - \frac{2{,}048}{16{,}384} = 1 - \frac{1}{8} = \frac{7}{8} = 87.5\%
+\]
+
+This matches the expected result: each 32-byte line serves 8 word accesses, so 7 out of 8 are hits.
+\end{solution}
+\end{example}
+
+\begin{example}[Average Memory Access Time]
+A system has L1 cache (1 cycle, 95\% hit rate), L2 cache (10 cycles, 80\% hit rate for L1 misses), and main memory (100 cycles). Calculate the average memory access time (AMAT).
+
+\begin{solution}
+\[
+  \text{AMAT} = T_{L1} + (1 - h_{L1}) \times \left[ T_{L2} + (1 - h_{L2}) \times T_{\text{mem}} \right]
+\]
+\[
+  = 1 + 0.05 \times [10 + 0.20 \times 100]
+\]
+\[
+  = 1 + 0.05 \times [10 + 20]
+\]
+\[
+  = 1 + 0.05 \times 30 = 1 + 1.5 = 2.5 \text{ cycles}
+\]
+
+The memory hierarchy reduces effective access time from 100 cycles to 2.5 cycles — a 40$\times$ improvement.
+\end{solution}
+\end{example}
+
+\begin{example}[Memory Section Sizing]
+An embedded project has the following memory usage:
+\begin{itemize}[nosep]
+  \item Application code: 48\,KB
+  \item Read-only constants: 8\,KB
+  \item Initialized variables: 2\,KB
+  \item Uninitialized buffers: 12\,KB
+  \item Stack requirement: 4\,KB
+\end{itemize}
+Determine the Flash and SRAM requirements.
+
+\begin{solution}
+\textbf{Flash} stores: \texttt{.text} (code) + \texttt{.rodata} (constants) + \texttt{.data} initialization values.
+\[
+  \text{Flash} = 48 + 8 + 2 = 58\,\text{KB}
+\]
+
+\textbf{SRAM} stores: \texttt{.data} (runtime copy) + \texttt{.bss} (zeroed) + stack.
+\[
+  \text{SRAM} = 2 + 12 + 4 = 18\,\text{KB}
+\]
+
+A suitable MCU: STM32F103 (64\,KB Flash, 20\,KB SRAM) or STM32F401 (256\,KB Flash, 64\,KB SRAM) for headroom.
+\end{solution}
+\end{example}
+
+% ----------------------------------------------------------------------------
+\section{Practice Problems}
+\label{sec:mem:practice}
+
+\begin{exercise}[Technology Selection]
+A wearable medical device needs 256\,KB of non-volatile storage that retains calibration data through power cycles, with low write power and at least $10^{10}$ write endurance. Which memory technology is most appropriate: Flash, EEPROM, MRAM, or FeRAM? Justify.
+\end{exercise}
+
+\begin{exercise}[Cache Associativity Analysis]
+A 4-way set-associative cache has 256 lines total, 64-byte line size, and uses LRU replacement. How many sets are there? For a 32-bit address, show the tag, set index, and byte offset bit fields.
+\end{exercise}
+
+\begin{exercise}[Cache Miss Classification]
+For a direct-mapped cache with 8 lines (line size 16 bytes), trace the following byte address access sequence and classify each access as compulsory miss, conflict miss, or hit: 0, 16, 128, 0, 256, 0, 16, 128.
+\end{exercise}
+
+\begin{exercise}[DMA Configuration]
+The ADC on an STM32 produces 12-bit samples at 1\,MSPS. Configure a DMA to transfer samples into a circular buffer of 1000 entries in SRAM. What is the required DMA bandwidth in bytes/second?
+\end{exercise}
+
+\begin{exercise}[Memory Map Interpretation]
+Given the STM32F407 memory map, explain why writing to address \hex{0800\_0000} does not directly modify Flash content (even though this is the Flash address range). What procedure is required to write to Flash?
+\end{exercise}
