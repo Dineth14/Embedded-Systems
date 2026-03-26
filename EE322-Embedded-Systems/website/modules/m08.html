@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M08 — Analysis &amp; Verification | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html" class="active">M08</a>
+      <a href="m09.html">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#profiling">Performance Profiling</a></li>
+        <li><a href="#memory">Memory Analysis</a></li>
+        <li><a href="#fmea">FMEA</a></li>
+        <li><a href="#reliability">Reliability Engineering</a></li>
+        <li><a href="#formal">Formal Verification</a></li>
+        <li><a href="#misra">MISRA-C Guidelines</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 08 — 4 Lecture Hours</div>
+        <h1 class="module-header__title">Analysis &amp; Verification</h1>
+      </div>
+
+      <section id="profiling" class="reveal">
+        <h2>Performance Profiling</h2>
+        <p>Profiling identifies bottlenecks and validates real-time constraints. Techniques range from hardware-assisted to software-instrumented.</p>
+        <h3>DWT Cycle Counter (Cortex-M)</h3>
+        <pre><code class="language-c">// Enable DWT cycle counter
+CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+DWT->CYCCNT = 0;
+DWT->CTRL   |= DWT_CTRL_CYCCNTENA_Msk;
+
+uint32_t t0 = DWT->CYCCNT;
+critical_function();
+uint32_t cycles = DWT->CYCCNT - t0;
+float us = (float)cycles / (SystemCoreClock / 1e6f);</code></pre>
+        <h3>GPIO Toggle Method</h3>
+        <p>Set a GPIO pin high before the function, low after. Measure the pulse with an oscilloscope or logic analyser — zero software overhead.</p>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Optimisation Priorities</div>
+          <table>
+            <thead><tr><th>Level</th><th>Technique</th><th>Typical Gain</th></tr></thead>
+            <tbody>
+              <tr><td>Algorithm</td><td>Better complexity class</td><td>10–1000×</td></tr>
+              <tr><td>Data structure</td><td>Cache-friendly layout</td><td>2–10×</td></tr>
+              <tr><td>Compiler</td><td><code>-O2</code> / <code>-Os</code> flags</td><td>1.5–3×</td></tr>
+              <tr><td>Micro</td><td>Loop unrolling, intrinsics</td><td>1.1–1.5×</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="memory" class="reveal">
+        <h2>Memory Analysis</h2>
+        <p>Embedded systems have tight memory budgets. The linker map file shows exactly where every byte goes:</p>
+        <table>
+          <thead><tr><th>Section</th><th>Contents</th><th>Memory Region</th></tr></thead>
+          <tbody>
+            <tr><td><code>.text</code></td><td>Code + constants</td><td>Flash</td></tr>
+            <tr><td><code>.rodata</code></td><td>Read-only data</td><td>Flash</td></tr>
+            <tr><td><code>.data</code></td><td>Initialised globals</td><td>Flash → RAM (copied)</td></tr>
+            <tr><td><code>.bss</code></td><td>Zero-initialised globals</td><td>RAM</td></tr>
+            <tr><td>Stack</td><td>Local variables, call frames</td><td>RAM (top-down)</td></tr>
+            <tr><td>Heap</td><td>Dynamic allocations</td><td>RAM (bottom-up)</td></tr>
+          </tbody>
+        </table>
+        <pre><code class="language-bash"># Check firmware size
+arm-none-eabi-size -A firmware.elf
+# Detailed map
+arm-none-eabi-nm --size-sort firmware.elf | tail -20</code></pre>
+        <div class="theory-panel theory-panel--warning">
+          <div class="theory-panel__label">Stack Overflow</div>
+          <p>Each RTOS task needs its own stack. Under-sized stacks cause silent corruption. Use stack painting (fill with <code>0xDEADBEEF</code>) and check high-water marks at runtime.</p>
+        </div>
+      </section>
+
+      <section id="fmea" class="reveal">
+        <h2>Failure Mode &amp; Effects Analysis (FMEA)</h2>
+        <p>FMEA systematically identifies potential failures before they occur. Each failure mode is scored:</p>
+        <p>$$\text{RPN} = \text{Severity} \times \text{Occurrence} \times \text{Detection}$$</p>
+        <p>Each factor is rated 1–10. High RPN items get priority for mitigation.</p>
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Example — Temperature Controller</div>
+          <table>
+            <thead><tr><th>Failure Mode</th><th>S</th><th>O</th><th>D</th><th>RPN</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td>Sensor open-circuit</td><td>9</td><td>3</td><td>2</td><td>54</td><td>Watchdog + range check</td></tr>
+              <tr><td>Heater stuck ON</td><td>10</td><td>2</td><td>3</td><td>60</td><td>HW thermal cutoff</td></tr>
+              <tr><td>ADC bit-flip</td><td>5</td><td>4</td><td>5</td><td>100</td><td>Median filter (3 samples)</td></tr>
+              <tr><td>Firmware hang</td><td>8</td><td>3</td><td>2</td><td>48</td><td>Independent watchdog</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="reliability" class="reveal">
+        <h2>Reliability Engineering</h2>
+        <p>For constant failure rate \(\lambda\) (exponential model):</p>
+        <p>$$R(t) = e^{-\lambda t}, \quad \text{MTTF} = \frac{1}{\lambda}, \quad A = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}}$$</p>
+
+        <h3>Triple Modular Redundancy (TMR)</h3>
+        <p>Three identical modules with majority voter. System fails only if ≥ 2 modules fail:</p>
+        <p>$$R_{\text{TMR}}(t) = 3R^2(t) - 2R^3(t)$$</p>
+        <div class="theory-panel theory-panel--insight">
+          <div class="theory-panel__label">TMR Cross-Over</div>
+          <p>TMR is more reliable than a simplex system only when individual reliability \(R &gt; 0.5\). Below that, redundancy increases the chance of majority failure.</p>
+        </div>
+
+        <h3>FIT Rate</h3>
+        <p>Failures In Time = failures per \(10^9\) device-hours. A component rated 100 FIT has \(\lambda = 10^{-7}\)/hr, MTTF = 10 million hours.</p>
+      </section>
+
+      <section id="formal" class="reveal">
+        <h2>Formal Verification</h2>
+        <h3>Model Checking with SPIN</h3>
+        <p>Express the system as a Promela model; SPIN exhaustively checks all reachable states against LTL properties.</p>
+        <pre><code class="language-c">/* Promela: producer-consumer */
+mtype = { DATA, ACK };
+chan ch = [2] of { mtype, byte };
+
+active proctype Producer() {
+    byte val = 0;
+    do
+    :: ch ! DATA, val -> val++
+    od
+}
+
+active proctype Consumer() {
+    byte v;
+    do
+    :: ch ? DATA, v -> printf("Got %d\n", v)
+    od
+}</code></pre>
+        <h3>LTL Properties</h3>
+        <p>Express safety and liveness:</p>
+        <ul>
+          <li><strong>Safety:</strong> \(\square \neg \text{deadlock}\) — "it is always the case that there is no deadlock"</li>
+          <li><strong>Liveness:</strong> \(\square(\text{request} \rightarrow \lozenge\text{grant})\) — "every request is eventually granted"</li>
+        </ul>
+      </section>
+
+      <section id="misra" class="reveal">
+        <h2>MISRA-C 2012 Guidelines</h2>
+        <p>MISRA-C restricts the C language to a safer subset for safety-critical embedded code. Key rules:</p>
+        <table>
+          <thead><tr><th>Rule</th><th>Category</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>1.3</td><td>Required</td><td>No undefined or critical unspecified behaviour</td></tr>
+            <tr><td>11.3</td><td>Required</td><td>No cast between pointer to object and integer</td></tr>
+            <tr><td>14.4</td><td>Required</td><td>Controlling expression must be essentially Boolean</td></tr>
+            <tr><td>17.7</td><td>Required</td><td>Return value of non-void function shall be used</td></tr>
+            <tr><td>21.3</td><td>Required</td><td>Do not use <code>malloc</code>, <code>calloc</code>, <code>realloc</code>, or <code>free</code></td></tr>
+          </tbody>
+        </table>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Static Analysis Tools</div>
+          <p>PC-lint, Polyspace, Coverity, and cppcheck can automatically check MISRA compliance. Integrate into CI/CD to catch violations before code review.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+</body>
+</html>

@@ -360,7 +360,7 @@ Queues provide safe, buffered communication between tasks without shared memory:
   \draw[arrow, ee-amber!70!black] (q4) -- (consumer) node[midway, above, font=\scriptsize] {xQueueReceive()};
   
   % Blocking annotations
-  \node[below=0.5cm of q2, font=\scriptsize\itshape, text=ee-gray] {Queue full $\Rightarrow$ Producer blocks\\Queue empty $\Rightarrow$ Consumer blocks};
+  \node[below=0.5cm of q2, font=\scriptsize\itshape, text=ee-gray, align=center] {Queue full $\Rightarrow$ Producer blocks\\Queue empty $\Rightarrow$ Consumer blocks};
   
 \end{tikzpicture}
 \caption{Producer-consumer pattern using a FIFO queue for inter-task communication.}

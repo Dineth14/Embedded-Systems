@@ -12,6 +12,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
+\usepackage{textcomp}
 \usepackage{microtype}
 
 % --- Mathematics ---
@@ -46,6 +47,7 @@
 
 % --- Code Listings ---
 \usepackage{listings}
+\usepackage{pifont}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -67,8 +69,21 @@
   literate={*}{{\char42}}1
 }
 
+\lstdefinelanguage{ARMAsm}{
+  morekeywords={
+    .syntax,.cpu,.thumb,.section,.word,.global,.type,.equ,.align,.space,
+    ldr,str,mov,add,sub,cmp,bne,beq,bl,bx,push,pop,ldm,stm,mul,and,orr,eor,
+    lsl,lsr,asr,nop,svc,mrs,msr,it,cbz,cbnz
+  },
+  sensitive=false,
+  morecomment=[l]{;},
+  morecomment=[l]{@},
+  morestring=[b]",
+  alsoletter={._%}
+}
+
 \lstdefinestyle{C}{language=C, morekeywords={uint8_t,uint16_t,uint32_t,int8_t,int16_t,int32_t,volatile,inline,bool,size_t}}
-\lstdefinestyle{ARM}{language=[ARM]Assembler, morekeywords={LDR,STR,MOV,ADD,SUB,CMP,BNE,BEQ,BL,BX,PUSH,POP,LDM,STM,MUL,AND,ORR,EOR,LSL,LSR,ASR,NOP,SVC,MRS,MSR,IT,CBZ,CBNZ}}
+\lstdefinestyle{ARM}{language=ARMAsm}
 \lstdefinestyle{Python}{language=Python, morekeywords={def,class,import,from,as,with,yield,async,await}}
 
 % --- Colored Boxes (tcolorbox) ---
@@ -232,6 +247,7 @@
 \fancyhead[R]{\textsc{EE322 --- Embedded Systems Design}}
 \fancyfoot[C]{\thepage}
 \fancyfoot[R]{\footnotesize Department of EEE, University of Peradeniya}
+\setlength{\headheight}{15pt}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0.2pt}
 
@@ -256,6 +272,7 @@
 
 % Frequency formatting
 \newcommand{\freq}[2]{#1\,\text{#2}}
+\newcommand{\degree}{\ensuremath{^\circ}}
 
 % Binary number formatting - monospace
 \newcommand{\binary}[1]{\texttt{#1\textsubscript{2}}}

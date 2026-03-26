@@ -364,10 +364,10 @@ Modern processors use branch predictors to guess the outcome of conditional bran
   \draw[arrow, ee-green!70!black] (ST) to[loop right] node[right, font=\scriptsize] {T} ();
   
   % Prediction labels
-  \node[below=0.5cm of SNT, font=\scriptsize\itshape, text=ee-red] {Predict:\\Not Taken};
-  \node[below=0.5cm of WNT, font=\scriptsize\itshape, text=ee-red] {Predict:\\Not Taken};
-  \node[below=0.5cm of WT, font=\scriptsize\itshape, text=ee-green!70!black] {Predict:\\Taken};
-  \node[below=0.5cm of ST, font=\scriptsize\itshape, text=ee-green!70!black] {Predict:\\Taken};
+  \node[below=0.5cm of SNT, font=\scriptsize\itshape, text=ee-red, align=center] {Predict:\\Not Taken};
+  \node[below=0.5cm of WNT, font=\scriptsize\itshape, text=ee-red, align=center] {Predict:\\Not Taken};
+  \node[below=0.5cm of WT, font=\scriptsize\itshape, text=ee-green!70!black, align=center] {Predict:\\Taken};
+  \node[below=0.5cm of ST, font=\scriptsize\itshape, text=ee-green!70!black, align=center] {Predict:\\Taken};
   
 \end{tikzpicture}
 \caption{2-bit saturating counter branch predictor state machine.}
@@ -451,10 +451,10 @@ Typical MCU peripherals include:
   % Left-side addresses
   \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {0 - 0.6}) {\hex{0000\_0000}};
   \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {0 + 0.6}) {\hex{0007\_FFFF}};
-  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sram.south |- sram.south}) {\hex{2000\_0000}};
-  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {periph.south |- periph.south}) {\hex{4000\_0000}};
-  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sys.south |- sys.south}) {\hex{E000\_0000}};
-  \node[font=\scriptsize\ttfamily, anchor=east] at (-3.2, {sys.north |- sys.north}) {\hex{E00F\_FFFF}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at ([xshift=-3.2cm]sram.south) {\hex{2000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at ([xshift=-3.2cm]periph.south) {\hex{4000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at ([xshift=-3.2cm]sys.south) {\hex{E000\_0000}};
+  \node[font=\scriptsize\ttfamily, anchor=east] at ([xshift=-3.2cm]sys.north) {\hex{E00F\_FFFF}};
   
 \end{tikzpicture}
 \caption{Simplified memory map of an STM32F4 microcontroller (Cortex-M4).}

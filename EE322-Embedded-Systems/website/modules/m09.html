@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M09 — Modeling | EE322</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/simulation.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__logo">EE322 <span>Embedded Systems</span></div>
+    <nav class="site-header__nav">
+      <a href="../index.html">Home</a>
+      <a href="m01.html">M01</a>
+      <a href="m02.html">M02</a>
+      <a href="m03.html">M03</a>
+      <a href="m04.html">M04</a>
+      <a href="m05.html">M05</a>
+      <a href="m06.html">M06</a>
+      <a href="m07.html">M07</a>
+      <a href="m08.html">M08</a>
+      <a href="m09.html" class="active">M09</a>
+    </nav>
+  </header>
+  <div class="progress-bar"><div class="progress-bar__fill"></div></div>
+
+  <div class="module-page">
+    <aside class="module-sidebar">
+      <div class="module-sidebar__title">Contents</div>
+      <ul class="module-sidebar__list">
+        <li><a href="#uml">UML for Embedded</a></li>
+        <li><a href="#fsm">Finite State Machines</a></li>
+        <li><a href="#impl">FSM Implementations</a></li>
+        <li><a href="#hsm">Hierarchical State Machines</a></li>
+        <li><a href="#mdd">Model-Driven Development</a></li>
+        <li><a href="#sim-uml">State Machine Simulation</a></li>
+      </ul>
+    </aside>
+
+    <main class="module-content">
+      <div class="module-header">
+        <div class="module-header__number">Module 09 — 4 Lecture Hours</div>
+        <h1 class="module-header__title">Modeling</h1>
+      </div>
+
+      <section id="uml" class="reveal">
+        <h2>UML for Embedded Systems</h2>
+        <p>UML provides standardised diagrams to capture structure and behaviour before writing code. The most useful diagrams for embedded work:</p>
+        <table>
+          <thead><tr><th>Diagram</th><th>Type</th><th>Captures</th></tr></thead>
+          <tbody>
+            <tr><td>Class</td><td>Structural</td><td>Module interfaces, data types, relationships</td></tr>
+            <tr><td>Sequence</td><td>Behavioural</td><td>Message flow between objects over time</td></tr>
+            <tr><td>State Machine</td><td>Behavioural</td><td>Event-driven behaviour with states &amp; transitions</td></tr>
+            <tr><td>Activity</td><td>Behavioural</td><td>Control flow — similar to flowcharts</td></tr>
+          </tbody>
+        </table>
+        <div class="theory-panel theory-panel--insight">
+          <div class="theory-panel__label">Why Model?</div>
+          <p>Models help catch design errors early — when fixing them costs minutes, not weeks. A state machine diagram reviewed before coding can eliminate entire classes of bugs.</p>
+        </div>
+      </section>
+
+      <section id="fsm" class="reveal">
+        <h2>Finite State Machines</h2>
+        <div class="theory-panel theory-panel--definition">
+          <div class="theory-panel__label">Definition</div>
+          <p>A Mealy FSM is a tuple \((S, \Sigma, \Lambda, \delta, \omega, s_0)\) where \(S\) = states, \(\Sigma\) = input alphabet, \(\Lambda\) = output alphabet, \(\delta: S \times \Sigma \rightarrow S\) = transition function, \(\omega: S \times \Sigma \rightarrow \Lambda\) = output function, \(s_0\) = initial state. A Moore FSM has \(\omega: S \rightarrow \Lambda\) (output depends only on state).</p>
+        </div>
+        <h3>Traffic Light FSM Example</h3>
+        <table>
+          <thead><tr><th>State</th><th>Event</th><th>Next State</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>RED</td><td>timer_expired</td><td>GREEN</td><td>start 30s timer</td></tr>
+            <tr><td>GREEN</td><td>timer_expired</td><td>YELLOW</td><td>start 5s timer</td></tr>
+            <tr><td>YELLOW</td><td>timer_expired</td><td>RED</td><td>start 45s timer</td></tr>
+            <tr><td>Any</td><td>emergency</td><td>RED_FLASH</td><td>flash red 1 Hz</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="impl" class="reveal">
+        <h2>FSM Implementation Patterns</h2>
+        <h3>Switch-Case</h3>
+        <pre><code class="language-c">typedef enum { ST_RED, ST_GREEN, ST_YELLOW } state_t;
+state_t state = ST_RED;
+
+void fsm_step(event_t evt) {
+    switch (state) {
+    case ST_RED:
+        if (evt == EVT_TIMER) {
+            set_light(GREEN);
+            start_timer(30000);
+            state = ST_GREEN;
+        }
+        break;
+    case ST_GREEN:
+        if (evt == EVT_TIMER) {
+            set_light(YELLOW);
+            start_timer(5000);
+            state = ST_YELLOW;
+        }
+        break;
+    case ST_YELLOW:
+        if (evt == EVT_TIMER) {
+            set_light(RED);
+            start_timer(45000);
+            state = ST_RED;
+        }
+        break;
+    }
+}</code></pre>
+
+        <h3>Table-Driven</h3>
+        <pre><code class="language-c">typedef struct {
+    state_t  current;
+    event_t  event;
+    state_t  next;
+    void   (*action)(void);
+} transition_t;
+
+const transition_t table[] = {
+    { ST_RED,    EVT_TIMER, ST_GREEN,  action_green  },
+    { ST_GREEN,  EVT_TIMER, ST_YELLOW, action_yellow },
+    { ST_YELLOW, EVT_TIMER, ST_RED,    action_red    },
+};
+
+void fsm_dispatch(event_t evt) {
+    for (int i = 0; i &lt; ARRAY_SIZE(table); i++) {
+        if (table[i].current == state &amp;&amp;
+            table[i].event   == evt) {
+            table[i].action();
+            state = table[i].next;
+            return;
+        }
+    }
+}</code></pre>
+        <div class="theory-panel theory-panel--important">
+          <div class="theory-panel__label">Trade-offs</div>
+          <p><strong>Switch-case:</strong> Simple, fast, easy to debug; grows unwieldy beyond ~10 states. <strong>Table-driven:</strong> Scales well, data-driven, easier to auto-generate; slightly more RAM, harder to step through in debugger.</p>
+        </div>
+      </section>
+
+      <section id="hsm" class="reveal">
+        <h2>Hierarchical State Machines (HSM)</h2>
+        <p>HSMs (Harel statecharts) add hierarchy: a superstate contains substates. Common behaviour is handled at the parent level, reducing duplication.</p>
+        <div class="theory-panel theory-panel--example">
+          <div class="theory-panel__label">Motor Controller HSM</div>
+          <p><strong>Superstate: OPERATIONAL</strong> (handles FAULT → ERROR globally)</p>
+          <ul>
+            <li>Sub: IDLE — waiting for START command → RUNNING</li>
+            <li>Sub: RUNNING — speed control loop. STOP → BRAKING</li>
+            <li>Sub: BRAKING — ramp-down. speed=0 → IDLE</li>
+          </ul>
+          <p>Any FAULT event in any substate propagates to parent OPERATIONAL, which transitions to ERROR — no need to duplicate the handler in each substate.</p>
+        </div>
+        <h3>Event Delegation</h3>
+        <pre><code class="language-c">state_t Running_handler(event_t evt) {
+    switch (evt) {
+    case EVT_STOP:  return ST_BRAKING;
+    default:        return Operational_handler(evt); // delegate to parent
+    }
+}</code></pre>
+      </section>
+
+      <section id="mdd" class="reveal">
+        <h2>Model-Driven Development</h2>
+        <p>Tools like Simulink Stateflow, YAKINDU, and Quantum Leaps QP generate C code directly from state machine models, ensuring the implementation matches the design.</p>
+        <div class="theory-panel theory-panel--insight">
+          <div class="theory-panel__label">Benefits</div>
+          <ul>
+            <li>Visual design that non-programmers (systems engineers) can review</li>
+            <li>Automatic code generation eliminates hand-coding errors</li>
+            <li>Formal verification possible on the model before deployment</li>
+            <li>Traceability from requirements → model → generated code</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- State Machine Simulation -->
+      <section id="sim-uml" class="reveal">
+        <h2>Interactive: State Machine Simulation</h2>
+        <div id="uml-sim" class="sim-container">
+          <div class="sim-container__header">
+            <div class="sim-container__title">Interactive Traffic-Light State Machine</div>
+            <div class="sim-container__controls">
+              <button class="btn btn--small" data-action="play">▶ Play</button>
+              <button class="btn btn--small" data-action="pause">⏸ Pause</button>
+              <button class="btn btn--small" data-action="step">⏭ Step</button>
+              <button class="btn btn--small btn--danger" data-action="reset">⟲ Reset</button>
+            </div>
+          </div>
+          <div class="sim-container__canvas" id="uml-canvas"></div>
+          <div class="control-group" style="padding: 0.75rem 1.25rem;">
+            <button class="btn btn--small" id="btn-emergency">⚠ Emergency</button>
+            <button class="btn btn--small" id="btn-clear">✓ Clear Emergency</button>
+          </div>
+          <div class="stat-display" id="uml-stats">
+            <div class="stat-item"><div class="stat-item__value" id="uml-state">RED</div><div class="stat-item__label">Current State</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="uml-timer">0</div><div class="stat-item__label">Timer (s)</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="uml-transitions">0</div><div class="stat-item__label">Transitions</div></div>
+            <div class="stat-item"><div class="stat-item__value" id="uml-events">0</div><div class="stat-item__label">Events</div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <p>EE322 — Embedded Systems Design | University of Peradeniya | Department of EEE</p>
+  </footer>
+  <script src="../js/core.js"></script>
+  <script src="../js/sim_uml_stateflow.js"></script>
+</body>
+</html>

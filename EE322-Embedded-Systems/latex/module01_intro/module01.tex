@@ -250,8 +250,8 @@ If $\lambda > 0.15$ (threshold for impending lockup), the controller commands th
   \draw[dasharrow, ee-red] (power) -| (dac);
   
   % Physical world label
-  \node[above=0.2cm of sensor, font=\small\itshape, text=ee-gray] {Physical\\World};
-  \node[above=0.2cm of actuator, font=\small\itshape, text=ee-gray] {Physical\\World};
+  \node[above=0.2cm of sensor, font=\small\itshape, text=ee-gray, align=center] {Physical\\World};
+  \node[above=0.2cm of actuator, font=\small\itshape, text=ee-gray, align=center] {Physical\\World};
   
   % Feedback
   \draw[arrow, ee-gray, dashed] (actuator.south) -- ++(0,-0.8) -| (sensor.south) node[pos=0.5, below, font=\footnotesize\itshape] {Feedback (physical process)};
