@@ -1,0 +1,51 @@
+name: Compile LaTeX and Release PDF
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main.tex
+          working_directory: EE322-Embedded-Systems/latex
+          latexmk_use_lualatex: false
+          latexmk_shell_escape: false
+
+      - name: Rename PDF
+        run: |
+          mv EE322-Embedded-Systems/latex/main.pdf EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf
+
+      - name: Upload PDF as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EE322-Embedded-Systems-Notes
+          path: EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create/Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest PDF Build"
+          body: |
+            Auto-compiled PDF from commit ${{ steps.sha.outputs.short }}.
+            Download the PDF below.
+          files: EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
