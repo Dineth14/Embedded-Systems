@@ -11,17 +11,16 @@ permissions:
 jobs:
   build-pdf:
     runs-on: ubuntu-latest
+    container:
+      image: texlive/texlive:latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Compile LaTeX document
-        uses: xu-cheng/latex-action@v3
-        with:
-          root_file: main.tex
-          working_directory: EE322-Embedded-Systems/latex
-          latexmk_use_lualatex: false
-          latexmk_shell_escape: false
+        working-directory: EE322-Embedded-Systems/latex
+        run: |
+          latexmk -pdf -interaction=nonstopmode main.tex
 
       - name: Rename PDF
         run: |
@@ -37,15 +36,18 @@ jobs:
         id: sha
         run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Create/Update Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: "Latest PDF Build"
-          body: |
-            Auto-compiled PDF from commit ${{ steps.sha.outputs.short }}.
-            Download the PDF below.
-          files: EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf
-          make_latest: true
+      - name: Create or update release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view latest --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload latest \
+              EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create latest \
+              EE322-Embedded-Systems/latex/EE322-Embedded-Systems-Notes.pdf \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Latest PDF Build" \
+              --notes "Auto-compiled PDF from commit ${{ steps.sha.outputs.short }}."
+          fi
