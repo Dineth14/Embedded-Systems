@@ -3,6 +3,8 @@
 > University of Peradeniya · Department of Electrical & Electronic Engineering  
 > 3-Credit Course (27 Lecture Hours)
 
+🌐 **Live Website:** [https://dineth14.github.io/Embedded-Systems/](https://dineth14.github.io/Embedded-Systems/)
+
 ---
 
 ## Overview
