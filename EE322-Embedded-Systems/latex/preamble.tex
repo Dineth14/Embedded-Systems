@@ -13,7 +13,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{textcomp}
-\usepackage{microtype}
+\usepackage[protrusion=false]{microtype}  % protrusion=false saves compile time
 
 % --- Mathematics ---
 \usepackage{amsmath}
@@ -29,12 +29,12 @@
 
 % --- TikZ and Plotting ---
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, automata, matrix, calc, decorations.markings, patterns, fit, backgrounds}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, automata, calc, fit, backgrounds}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 
 % --- Colors ---
-\usepackage[dvipsnames,svgnames,x11names]{xcolor}
+\usepackage[dvipsnames]{xcolor}
 
 \definecolor{ee-dark}{HTML}{0D1117}
 \definecolor{ee-green}{HTML}{00FF9C}
