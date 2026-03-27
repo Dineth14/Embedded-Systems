@@ -1,0 +1,40 @@
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {1.1}{\ignorespaces Generic embedded system block diagram: sensor $\rightarrow $ MCU $\rightarrow $ actuator with power supply and communication interface.}}{7}{figure.caption.7}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Von Neumann architecture: single shared bus for instructions and data.}}{12}{figure.caption.8}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces Harvard architecture: separate instruction and data buses enabling simultaneous access.}}{12}{figure.caption.9}%
+\contentsline {figure}{\numberline {2.3}{\ignorespaces 5-stage instruction pipeline showing overlapped execution of four instructions.}}{16}{figure.caption.13}%
+\contentsline {figure}{\numberline {2.4}{\ignorespaces 2-bit saturating counter branch predictor state machine.}}{17}{figure.caption.14}%
+\contentsline {figure}{\numberline {2.5}{\ignorespaces ARM Cortex-M3/M4 3-stage pipeline architecture.}}{17}{figure.caption.15}%
+\contentsline {figure}{\numberline {2.6}{\ignorespaces Simplified memory map of an STM32F4 microcontroller (Cortex-M4).}}{19}{figure.caption.16}%
+\contentsline {figure}{\numberline {2.7}{\ignorespaces Interrupt latency: from IRQ assertion to first ISR instruction on ARM Cortex-M3.}}{20}{figure.caption.17}%
+\contentsline {figure}{\numberline {2.8}{\ignorespaces 5-stage pipeline datapath showing EX-to-EX and MEM-to-EX forwarding paths (dashed red arrows) that resolve data hazards without stalling.}}{21}{figure.caption.18}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces SHARC super-Harvard architecture with dual data memory buses enabling three parallel memory accesses.}}{30}{figure.caption.20}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Simplified 6T SRAM cell: two cross-coupled inverters with two access transistors controlled by the word line.}}{40}{figure.caption.22}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Memory hierarchy pyramid: speed and cost increase towards the top; capacity increases towards the bottom.}}{42}{figure.caption.24}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces STM32F407 memory map showing Flash, SRAM, peripheral, and Cortex-M system address regions.}}{44}{figure.caption.25}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces SAR ADC block diagram: successive approximation register with internal DAC feedback.}}{50}{figure.caption.26}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces UART frame format: idle HIGH, start bit (LOW), 8 data bits (LSB first), optional parity, stop bit (HIGH).}}{53}{figure.caption.28}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces SPI Mode 0 timing: CPOL=0, CPHA=0. Data sampled on rising clock edge.}}{54}{figure.caption.30}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces I\textsuperscript {2}C transaction: START (S), 7-bit address, R/W bit, ACK from slave, STOP (P).}}{54}{figure.caption.31}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Thread (task) state transition diagram: New $\to $ Ready $\to $ Running $\leftrightarrow $ Blocked $\to $ Terminated.}}{61}{figure.caption.32}%
+\contentsline {figure}{\numberline {6.2}{\ignorespaces Priority inversion: high-priority task H is blocked while medium-priority task M runs.}}{64}{figure.caption.33}%
+\contentsline {figure}{\numberline {6.3}{\ignorespaces Priority inheritance: L inherits H's priority, preventing M from causing unbounded inversion.}}{64}{figure.caption.34}%
+\contentsline {figure}{\numberline {6.4}{\ignorespaces Producer-consumer pattern using a FIFO queue for inter-task communication.}}{65}{figure.caption.35}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {7.1}{\ignorespaces RMS Gantt chart for the task set over the hyperperiod $[0, 12)$.}}{73}{figure.caption.39}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces EDF schedule for the same task set. Note the different execution order due to dynamic priorities.}}{74}{figure.caption.40}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {8.1}{\ignorespaces Bathtub curve: failure rate over the lifetime of electronic systems.}}{82}{figure.caption.43}%
+\contentsline {figure}{\numberline {8.2}{\ignorespaces Triple Modular Redundancy: three identical modules feed a majority voter.}}{82}{figure.caption.44}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {9.1}{\ignorespaces UML class diagram: temperature controller with sensor abstraction.}}{90}{figure.caption.46}%
+\contentsline {figure}{\numberline {9.2}{\ignorespaces UML sequence diagram: periodic temperature control loop.}}{90}{figure.caption.47}%
+\contentsline {figure}{\numberline {9.3}{\ignorespaces FSM for a traffic light controller with emergency override.}}{91}{figure.caption.48}%
+\contentsline {figure}{\numberline {9.4}{\ignorespaces HSM: Motor controller with ``Operational'' superstate and ``Fault'' handling. The fault transition applies to all substates simultaneously.}}{95}{figure.caption.49}%
+\contentsline {figure}{\numberline {9.5}{\ignorespaces Vending machine FSM.}}{98}{figure.caption.50}%
+\contentsline {figure}{\numberline {9.6}{\ignorespaces Microwave oven UML state machine diagram.}}{99}{figure.caption.51}%

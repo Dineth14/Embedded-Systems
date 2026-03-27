@@ -1,0 +1,26 @@
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces General-purpose computer vs.\ embedded system.}}{2}{table.caption.4}%
+\contentsline {table}{\numberline {1.2}{\ignorespaces Embedded system application domains and constraints.}}{3}{table.caption.5}%
+\contentsline {table}{\numberline {1.3}{\ignorespaces Platform comparison: microprocessor vs.\ microcontroller vs.\ SBC vs.\ industrial PC.}}{5}{table.caption.6}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Von Neumann vs.\ Harvard architecture comparison.}}{13}{table.caption.10}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces CISC vs.\ RISC design philosophies.}}{14}{table.caption.11}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Common addressing modes in embedded processors.}}{15}{table.caption.12}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces ARM Cortex family comparison matrix.}}{29}{table.caption.19}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Standard memory sections in an embedded C program.}}{34}{table.caption.21}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Memory technology comparison.}}{42}{table.caption.23}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces I/O strategies comparison.}}{51}{table.caption.27}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces SPI modes.}}{54}{table.caption.29}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Classification of scheduling algorithms.}}{70}{table.caption.36}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Liu--Layland utilisation bound $U_{\mathrm {lub}}(n) = n(2^{1/n} - 1)$.}}{70}{table.caption.37}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces Comparison of RMS and EDF scheduling algorithms.}}{72}{table.caption.38}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {8.1}{\ignorespaces Common embedded optimisation strategies.}}{80}{table.caption.41}%
+\contentsline {table}{\numberline {8.2}{\ignorespaces Example FMEA table for an embedded temperature controller.}}{81}{table.caption.42}%
+\contentsline {table}{\numberline {8.3}{\ignorespaces Selected MISRA-C 2012 rules relevant to embedded programming.}}{85}{table.caption.45}%
+\addvspace {10\p@ }
