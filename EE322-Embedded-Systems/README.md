@@ -57,7 +57,12 @@ EE322-Embedded-Systems/
 
 ## Building the LaTeX Notes
 
-### Requirements
+### Pre-built PDF
+
+The PDF is **automatically compiled** on every push via GitHub Actions.  
+Download the latest version from the [**Releases page**](https://github.com/Dineth14/Embedded-Systems/releases/tag/latest).
+
+### Requirements (local build)
 
 - TeX Live 2023+ or MiKTeX (full install recommended)
 - `biber` (ships with TeX Live)
